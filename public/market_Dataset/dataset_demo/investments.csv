@@ -1,0 +1,7 @@
+date,amount,category,description,expected_roi,actual_roi
+2025-01-12,15000,Cold Chain,Milk and yogurt refrigeration upgrades,14,12
+2025-01-25,9000,Merchandising,Premium grocery aisle revamp,18,20
+2025-02-10,12000,Marketing,Regional digital campaign,20,17
+2025-02-20,8000,Sourcing,Local produce contract,16,15
+2025-03-08,14000,Operations,Warehouse automation tools,22,19
+2025-03-18,7000,Customer Experience,Loyalty program pilot,15,16

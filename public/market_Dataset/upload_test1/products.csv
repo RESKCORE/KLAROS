@@ -1,0 +1,13 @@
+sku,name,category,subcategory,brand,price,cost,supplier,shelf_life_days,weight_kg,launch_date
+SKU-RCE-01,Basmati Rice 5kg,Groceries,Grains,GoldenHarvest,820,640,AgriPrime,365,5,2024-03-12
+SKU-OIL-01,Sunflower Oil 1L,Groceries,Oil,SunPure,175,128,SunPure,540,1,2024-02-05
+SKU-MLK-01,Whole Milk 1L,Dairy,Milk,DairyBest,64,46,DairyBest,12,1,2023-11-15
+SKU-YGT-01,Greek Yogurt 200g,Dairy,Yogurt,DairyBest,58,36,DairyBest,10,0.2,2024-01-08
+SKU-APL-01,Fresh Apple,Produce,Fruits,FarmFresh,125,74,GreenGrow,14,1,2024-01-10
+SKU-BAN-01,Banana Bunch,Produce,Fruits,FarmFresh,70,42,GreenGrow,10,1,2024-01-10
+SKU-BRD-01,Whole Wheat Bread,Bakery,Bread,BakeHouse,48,30,BakeHouse,7,0.5,2023-12-02
+SKU-TEA-01,Assam Tea 500g,Beverages,Tea,BrewMaster,220,150,BrewMaster,365,0.5,2023-10-18
+SKU-CFE-01,Ground Coffee 250g,Beverages,Coffee,BrewMaster,330,230,BrewMaster,365,0.25,2024-01-05
+SKU-NDL-01,Instant Noodles 6 pack,Snacks,Ready-to-eat,QuickBite,130,82,QuickBite,240,0.48,2024-02-26
+SKU-CKI-01,Butter Cookies 200g,Snacks,Confectionery,Crunchy,98,64,Crunchy,180,0.2,2024-03-20
+SKU-TMT-01,Tomatoes 1kg,Produce,Vegetables,GreenGrow,55,32,GreenGrow,7,1,2024-01-22

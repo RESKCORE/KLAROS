@@ -23,7 +23,9 @@ import { cn } from "@/lib/utils";
 import type { Decision } from "@/types/decision";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { deleteDecision, archiveDecision } from "@/lib/supabase-service";
+import { deleteDecision, archiveDecision } from "@/lib/decision-store";
+import { useAuth } from "@clerk/react";
+import { isV2Decision } from "@/lib/decision-workflow";
 
 interface DecisionCardProps {
   decision: Decision;
@@ -32,7 +34,6 @@ interface DecisionCardProps {
   style?: React.CSSProperties;
   onDelete?: () => void;
   onUpdate?: () => void;
-  isSample?: boolean;
 }
 
 const statusConfig = {
@@ -58,9 +59,10 @@ const statusConfig = {
   },
 };
 
-export function DecisionCard({ decision, viewMode = "grid", className, style, onDelete, onUpdate, isSample = false }: DecisionCardProps) {
+export function DecisionCard({ decision, viewMode = "grid", className, style, onDelete, onUpdate }: DecisionCardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getToken } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -72,11 +74,13 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
 
   const status = statusConfig[decision.status] || statusConfig.draft;
   const confidence = decision.result_json?.recommendation?.confidence;
+  const isBusinessIntelligence = isV2Decision(decision);
+  const editPath = `/decisions/${decision.id}/result`;
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await deleteDecision(decision.id);
+      await deleteDecision(decision.id, getToken);
       
       toast({
         title: "Decision deleted",
@@ -109,7 +113,7 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
 
   const handleArchive = async () => {
     try {
-      await archiveDecision(decision.id);
+      await archiveDecision(decision.id, getToken);
       
       toast({
         title: decision.status === "archived" ? "Decision unarchived" : "Decision archived",
@@ -143,6 +147,11 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1.5">
             <h3 className="font-semibold truncate group-hover:text-primary transition-colors">{decision.title}</h3>
+            {isBusinessIntelligence && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                BI
+              </Badge>
+            )}
             <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border", status.color)}>
               <span className={cn("h-1.5 w-1.5 rounded-full", status.dotColor)} />
               {status.label}
@@ -184,39 +193,29 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {!isSample && (
-                <>
-                  <DropdownMenuItem 
-                    className="gap-2"
-                    onClick={() => navigate(`/decisions/${decision.id}`)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    Edit Decision
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
-                    <Copy className="h-4 w-4" />
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2" onClick={handleArchive}>
-                    <Archive className="h-4 w-4" />
-                    {decision.status === "archived" ? "Unarchive" : "Archive"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    className="gap-2 text-destructive focus:text-destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              )}
-              {isSample && (
-                <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
-                  <Copy className="h-4 w-4" />
-                  Use as Template
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem 
+                className="gap-2"
+                onClick={() => navigate(editPath)}
+              >
+                <Edit2 className="h-4 w-4" />
+                View Analysis
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
+                <Copy className="h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={handleArchive}>
+                <Archive className="h-4 w-4" />
+                {decision.status === "archived" ? "Unarchive" : "Archive"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="gap-2 text-destructive focus:text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -271,39 +270,29 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            {!isSample && (
-              <>
-                <DropdownMenuItem 
-                  className="gap-2"
-                  onClick={() => navigate(`/decisions/${decision.id}`)}
-                >
-                  <Edit2 className="h-4 w-4" />
-                  Edit Decision
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
-                  <Copy className="h-4 w-4" />
-                  Duplicate
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2" onClick={handleArchive}>
-                  <Archive className="h-4 w-4" />
-                  {decision.status === "archived" ? "Unarchive" : "Archive"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="gap-2 text-destructive focus:text-destructive"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </>
-            )}
-            {isSample && (
-              <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
-                <Copy className="h-4 w-4" />
-                Use as Template
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem 
+              className="gap-2"
+              onClick={() => navigate(editPath)}
+            >
+              <Edit2 className="h-4 w-4" />
+              View Analysis
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={handleDuplicate}>
+              <Copy className="h-4 w-4" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={handleArchive}>
+              <Archive className="h-4 w-4" />
+              {decision.status === "archived" ? "Unarchive" : "Archive"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="gap-2 text-destructive focus:text-destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -348,6 +337,11 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
       <h3 className="relative font-semibold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors">
         {decision.title}
       </h3>
+      {isBusinessIntelligence && (
+        <Badge variant="secondary" className="relative mb-3 text-[10px] uppercase tracking-wide">
+          BI
+        </Badge>
+      )}
 
       {/* Context preview */}
       {decision.context && (
@@ -370,10 +364,10 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
 
       {/* Actions */}
       <div className="relative flex items-center gap-2 pt-4 border-t border-border/60">
-        <Link to={`/decisions/${decision.id}`} className="flex-1">
+        <Link to={`/decisions/${decision.id}/result`} className="flex-1">
           <Button variant="outline" size="sm" className="w-full gap-1.5 bg-background/50 hover:bg-background">
             <Edit2 className="h-4 w-4" />
-            Edit
+            View
           </Button>
         </Link>
         {decision.status === "done" ? (
@@ -384,10 +378,10 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
             </Button>
           </Link>
         ) : decision.status === "draft" ? (
-          <Link to={`/decisions/${decision.id}`} className="flex-1">
+          <Link to={`/decisions/${decision.id}/result`} className="flex-1">
             <Button size="sm" className="w-full gap-1.5 shadow-lg shadow-primary/20">
               <Sparkles className="h-4 w-4" />
-              Continue
+              Open
             </Button>
           </Link>
         ) : decision.status === "analyzing" ? (

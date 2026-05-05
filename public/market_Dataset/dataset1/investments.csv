@@ -1,0 +1,6 @@
+date,amount,category,description,expected_roi,actual_roi
+2025-01-12,12000,Cold Chain,Milk and juice refrigeration upgrades,14,12
+2025-01-20,8000,Merchandising,Impulse snack display redesign,18,21
+2025-02-10,15000,Sourcing,Premium rice procurement contract,16,14
+2025-02-18,6000,Marketing,City-specific digital campaign,20,17
+2025-03-05,9000,Inventory Automation,Reorder alert pilot rollout,22,19

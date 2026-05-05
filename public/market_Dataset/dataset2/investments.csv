@@ -1,0 +1,5 @@
+date,amount,category,description,expected_roi,actual_roi
+2025-01-15,10000,Supply Chain,Vegetable procurement optimization,15,13
+2025-01-22,7000,Category Expansion,Premium cheese shelf expansion,19,16
+2025-02-12,9000,Promotion,Weekend combo offers,17,20
+2025-02-19,11000,Automation,Demand forecasting pilot,21,18

@@ -1,0 +1,16 @@
+sku,name,category,subcategory,brand,price,cost,supplier,shelf_life_days,weight_kg,launch_date
+SKU-RCE-02,Premium Rice 10kg,Groceries,Grains,HarvestGold,1490,1120,AgriPrime,365,10,2024-04-15
+SKU-OIL-02,Olive Oil 500ml,Groceries,Oil,Oliva,420,310,Oliva,540,0.5,2024-02-20
+SKU-MLK-02,Low Fat Milk 1L,Dairy,Milk,DairyLite,58,41,DairyLite,12,1,2023-11-25
+SKU-YGT-02,Strawberry Yogurt 200g,Dairy,Yogurt,DairyLite,52,32,DairyLite,10,0.2,2024-01-18
+SKU-ORG-01,Orange 1kg,Produce,Fruits,SunFields,95,58,SunFields,12,1,2024-01-14
+SKU-GRP-01,Green Grapes 500g,Produce,Fruits,VineFresh,140,96,VineFresh,10,0.5,2024-01-21
+SKU-BRD-02,Multigrain Bread,Bakery,Bread,BakeHouse,52,32,BakeHouse,7,0.5,2023-12-08
+SKU-TEA-02,Masala Tea 500g,Beverages,Tea,SpiceLeaf,185,125,SpiceLeaf,365,0.5,2023-10-30
+SKU-CFE-02,Espresso Beans 250g,Beverages,Coffee,BrewMaster,360,260,BrewMaster,365,0.25,2024-01-12
+SKU-NDL-02,Instant Noodles 12 pack,Snacks,Ready-to-eat,QuickBite,220,150,QuickBite,240,0.96,2024-02-28
+SKU-CKI-02,Oat Cookies 200g,Snacks,Confectionery,Crunchy,105,70,Crunchy,180,0.2,2024-03-22
+SKU-TMT-02,Tomatoes 2kg,Produce,Vegetables,GreenGrow,95,58,GreenGrow,7,2,2024-01-28
+SKU-CHS-02,Cheddar Cheese 400g,Dairy,Cheese,DairyLite,310,230,DairyLite,30,0.4,2024-02-18
+SKU-EGG-02,Eggs 30 pack,Dairy,Eggs,FarmFresh,220,150,FarmFresh,21,1.2,2024-01-20
+SKU-ICE-02,Premium Gelato 500ml,Frozen,Ice Cream,Frosty,210,150,Frosty,180,0.5,2024-04-05

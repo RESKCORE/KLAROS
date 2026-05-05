@@ -133,7 +133,7 @@ export function NavBar({ items, className }: NavBarProps) {
         </Link>
 
         {/* Get Started Button */}
-        <Link to="/decisions/new">
+        <Link to="/connect-data">
           <Button 
             size="sm" 
             className="gap-2 h-10 px-4 rounded-full shadow-lg shadow-primary/25 hover:shadow-primary/30"

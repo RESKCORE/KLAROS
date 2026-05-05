@@ -1,0 +1,9 @@
+sku,name,category,subcategory,brand,price,cost,supplier,shelf_life_days,weight_kg,launch_date
+SKU-TMT-01,Tomato,Produce,Vegetables,FarmFresh,2.1,1.2,GreenGrow,8,0.15,2024-03-01
+SKU-POT-01,Potato,Produce,Vegetables,FarmFresh,1.5,0.9,GreenGrow,20,0.25,2024-03-01
+SKU-CHS-01,Cheddar Cheese 200g,Dairy,Cheese,DairyBest,4.8,3.2,DairyBest,25,0.2,2023-12-22
+SKU-EGG-01,Eggs 12 Pack,Dairy,Eggs,DairyBest,3.6,2.4,DairyBest,18,0.65,2024-01-05
+SKU-PST-01,Pasta 500g,Groceries,Staples,GrainCo,2.7,1.6,GrainCo,365,0.5,2023-10-01
+SKU-SAU-01,Tomato Sauce,Groceries,Sauces,PureDrop,3.1,1.9,PureDrop,240,0.4,2023-11-11
+SKU-CKI-01,Cookies,Snacks,Sweet,Crunchy,2.4,1.2,CrunchyFoods,180,0.1,2024-02-20
+SKU-TEA-01,Black Tea 250g,Beverages,Tea,SunSip,5.2,3.0,SunSip,365,0.25,2024-01-28

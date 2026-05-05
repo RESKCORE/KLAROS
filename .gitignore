@@ -44,6 +44,9 @@ coverage/
 .nyc_output/
 *.lcov
 .jest/
+playwright-report/
+test-results/
+blob-report/
 
 # ============================================
 # Cache & Temporary Files
@@ -106,13 +109,6 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
-
-# ============================================
-# Supabase
-# ============================================
-supabase/.branches/
-supabase/.temp/
-.supabase/
 
 # ============================================
 # Package Manager Locks (Optional)

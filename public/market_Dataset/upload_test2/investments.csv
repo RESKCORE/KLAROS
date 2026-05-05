@@ -1,0 +1,7 @@
+date,amount,category,description,expected_roi,actual_roi
+2025-01-15,18000,Cold Chain,Freezer upgrades for frozen and dairy,16,14
+2025-01-28,9500,Merchandising,Premium grocery end-cap displays,18,21
+2025-02-12,12500,Marketing,City launch campaign,20,18
+2025-02-22,8600,Sourcing,Long-term grains contract,15,14
+2025-03-10,16000,Operations,Inventory optimization software,22,20
+2025-03-21,8200,Customer Experience,Digital loyalty program,16,17

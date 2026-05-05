@@ -2,13 +2,11 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
-  Plus,
-  Settings,
+  Database,
   History,
   ChevronLeft,
   ChevronRight,
   LogOut,
-  User,
   Menu,
   X
 } from "lucide-react";
@@ -16,8 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/contexts/ClerkAuthContext";
-import { useUser } from "@clerk/clerk-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useUser } from "@clerk/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -50,9 +47,8 @@ export function DashboardSidebar() {
 
   const navItems = [
     { name: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { name: "New Decision", url: "/decisions/new", icon: Plus },
+    { name: "Connect Data", url: "/connect-data", icon: Database },
     { name: "History", url: "/history", icon: History },
-    { name: "Settings", url: "/settings", icon: Settings },
   ];
 
   // Mobile menu toggle button
@@ -60,7 +56,7 @@ export function DashboardSidebar() {
     <Button
       variant="ghost"
       size="sm"
-      className="fixed top-4 left-4 z-50 md:hidden"
+      className="fixed top-4 left-4 z-50 md:hidden rounded-full border bg-background/90 shadow-sm"
       onClick={() => setMobileOpen(!mobileOpen)}
     >
       {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -71,8 +67,9 @@ export function DashboardSidebar() {
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-center border-b border-border px-4">
-        <Link to="/" className="flex items-center justify-center">
+      <div className="relative flex h-20 items-center justify-center border-b border-border px-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+        <Link to="/" className="relative flex items-center justify-center">
           <Logo size="sm" />
         </Link>
       </div>
@@ -88,15 +85,24 @@ export function DashboardSidebar() {
               key={item.name}
               to={item.url}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 !isMobile && collapsed && "justify-center"
               )}
               title={!isMobile && collapsed ? item.name : undefined}
             >
-              <Icon className="h-5 w-5 flex-shrink-0" />
+              <span
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                  isActive
+                    ? "bg-primary-foreground/15"
+                    : "bg-muted/40 group-hover:bg-muted"
+                )}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+              </span>
               {(isMobile || !collapsed) && <span>{item.name}</span>}
             </Link>
           );
@@ -104,12 +110,12 @@ export function DashboardSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border p-3 space-y-2">
+      <div className="border-t border-border/60 p-3 space-y-2">
         {/* User Profile */}
         <Link
-          to="/settings"
+          to="/dashboard"
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-accent",
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all hover:bg-muted/60",
             !isMobile && collapsed && "justify-center"
           )}
           title={!isMobile && collapsed ? userName : undefined}
@@ -132,7 +138,7 @@ export function DashboardSidebar() {
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-start gap-3 text-muted-foreground hover:text-foreground",
+            "w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-muted/60",
             !isMobile && collapsed && "justify-center px-2"
           )}
           title={!isMobile && collapsed ? "Logout" : undefined}
@@ -174,7 +180,7 @@ export function DashboardSidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen border-r border-border bg-background/95 backdrop-blur-sm transition-all duration-300",
+          "fixed left-0 top-0 z-40 h-screen border-r border-border/60 bg-gradient-to-b from-background via-background to-muted/40 backdrop-blur-sm transition-all duration-300",
           // Mobile styles
           isMobile
             ? cn(

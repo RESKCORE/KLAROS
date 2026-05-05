@@ -1,11 +1,11 @@
-import { LayoutDashboard, Plus, Home } from "lucide-react";
+import { LayoutDashboard, Database, Home } from "lucide-react";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 
 export function Header() {
   const navItems = [
     { name: "Home", url: "/", icon: Home },
     { name: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { name: "New Decision", url: "/decisions/new", icon: Plus },
+    { name: "Connect Data", url: "/connect-data", icon: Database },
   ];
 
   return (

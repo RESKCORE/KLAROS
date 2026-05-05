@@ -35,7 +35,7 @@ export async function exportDecisionToPDF(decision: Decision, result: AnalysisRe
     };
 
     // Helper to draw info box
-    const drawInfoBox = (title: string, content: string, color: number[] = [239, 246, 255]) => {
+    const drawInfoBox = (title: string, content: string, color: [number, number, number] = [239, 246, 255]) => {
       checkNewPage(40);
       const boxHeight = 35;
       doc.setFillColor(...color);

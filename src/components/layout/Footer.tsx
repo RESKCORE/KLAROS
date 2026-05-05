@@ -39,8 +39,8 @@ export function Footer() {
               <Link to="/dashboard" className="hover:text-foreground transition-colors w-fit">
                 Dashboard
               </Link>
-              <Link to="/decisions/new" className="hover:text-foreground transition-colors w-fit">
-                New Decision
+              <Link to="/connect-data" className="hover:text-foreground transition-colors w-fit">
+                Connect Data
               </Link>
               <a href="#how-it-works" className="hover:text-foreground transition-colors w-fit">
                 How It Works

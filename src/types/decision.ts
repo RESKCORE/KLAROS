@@ -4,6 +4,7 @@ export interface Option {
   id: string;
   label: string;
   notes?: string;
+  description?: string;
 }
 
 export interface Criterion {
@@ -17,7 +18,8 @@ export interface Constraint {
   id: string;
   type: 'budget' | 'timeline' | 'risk' | 'other';
   value: string;
-  priority: number;
+  priority?: number;
+  description?: string;
 }
 
 export interface Decision {
@@ -25,11 +27,12 @@ export interface Decision {
   title: string;
   context?: string;
   status: DecisionStatus;
+  data_source_id?: string | null;
+  decision_type?: string | null;
   options: Option[];
   criteria: Criterion[];
   constraints: Constraint[];
   result_json?: AnalysisResult;
-  analysis_result?: AnalysisResult; // For sample decisions
   created_at: string;
   updated_at: string;
   user_id?: string;
@@ -42,12 +45,7 @@ export interface AnalysisResult {
     confidence: number;
     summary: string;
   };
-  scores: {
-    optionId: string;
-    optionLabel: string;
-    criteriaScores: { criterionId: string; criterionName: string; score: number }[];
-    totalScore: number;
-  }[];
+  scores: OptionScore[];
   reasoning: {
     decomposition: string;
     assumptions: string[];
@@ -57,10 +55,10 @@ export interface AnalysisResult {
   };
 }
 
-export interface DecisionFormData {
-  title: string;
-  context: string;
-  options: Option[];
-  criteria: Criterion[];
-  constraints: Constraint[];
+export interface OptionScore {
+  optionId: string;
+  optionLabel: string;
+  criteriaScores: { criterionId: string; criterionName: string; score: number }[];
+  totalScore: number;
+  rank?: number;
 }

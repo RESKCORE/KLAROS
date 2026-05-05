@@ -5,34 +5,34 @@ const steps = [
   {
     icon: FileText,
     step: "01",
-    title: "Define Your Decision",
-    description: "Describe what you're deciding and provide context about your situation and goals.",
-    gradient: "from-blue-500 to-cyan-500",
-    shadowColor: "shadow-blue-500/25",
+    title: "Connect your data",
+    description: "Bring in sales, stock, and investment signals from your datasets.",
+    gradient: "from-emerald-500 to-teal-500",
+    shadowColor: "shadow-emerald-500/25",
   },
   {
     icon: ListChecks,
     step: "02",
-    title: "Add Options & Criteria",
-    description: "List your alternatives and define what matters most with weighted importance.",
-    gradient: "from-violet-500 to-purple-500",
-    shadowColor: "shadow-violet-500/25",
+    title: "Frame the decision",
+    description: "Capture options, constraints, and what success looks like.",
+    gradient: "from-cyan-500 to-sky-500",
+    shadowColor: "shadow-cyan-500/25",
   },
   {
     icon: Cpu,
     step: "03",
-    title: "AI Analysis",
-    description: "Our AI evaluates each option against your criteria, constraints, and tradeoffs.",
-    gradient: "from-emerald-500 to-green-500",
-    shadowColor: "shadow-emerald-500/25",
+    title: "Score scenarios",
+    description: "See weighted rankings and the drivers behind each outcome.",
+    gradient: "from-amber-500 to-orange-500",
+    shadowColor: "shadow-amber-500/25",
   },
   {
     icon: CheckCircle2,
     step: "04",
-    title: "Get Recommendations",
-    description: "Receive clear recommendations with detailed reasoning and confidence scores.",
-    gradient: "from-amber-500 to-orange-500",
-    shadowColor: "shadow-amber-500/25",
+    title: "Act with confidence",
+    description: "Share a recommendation backed by data and documented tradeoffs.",
+    gradient: "from-slate-500 to-slate-700",
+    shadowColor: "shadow-slate-500/25",
   },
 ];
 
@@ -40,17 +40,17 @@ export function HowItWorks() {
   return (
     <section id="how-it-works" className="py-24 relative overflow-hidden">
       {/* Background */}
-      <div className="absolute inset-0 bg-muted/30" />
-      <div className="absolute inset-0 bg-mesh opacity-30" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white via-emerald-50/40 to-slate-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(16,185,129,0.12),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(14,116,144,0.1),transparent_45%)]" />
 
       <div className="container relative">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6">
-            Simple Process
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/70 px-4 py-1.5 text-sm font-medium text-emerald-700 mb-6">
+            From data to decisions
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">How KLAROS Works</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Four simple steps to transform uncertainty into clarity and confidence
+          <h2 className="text-3xl sm:text-4xl font-semibold mb-4">How Klaros delivers clarity</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+            A fast, repeatable workflow that turns signals into action
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export function HowItWorks() {
                   </div>
                 )}
 
-                <div className="relative bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border/60 transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 h-full">
+                <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-border/60 transition-all duration-300 hover:border-emerald-400/40 hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 h-full">
                   {/* Step number badge */}
                   <div className={cn(
                     "absolute -top-3 -right-3 flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white shadow-lg bg-gradient-to-br",
@@ -89,8 +89,8 @@ export function HowItWorks() {
                     <Icon className="h-7 w-7" />
                   </div>
 
-                  <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                  <h3 className="font-semibold text-lg mb-2 text-slate-900">{item.title}</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
                 </div>
               </div>
             );

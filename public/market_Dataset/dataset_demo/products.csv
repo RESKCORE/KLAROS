@@ -1,0 +1,16 @@
+sku,name,category,subcategory,brand,price,cost,supplier,shelf_life_days,weight_kg,launch_date
+SKU-RCE-01,Basmati Rice 5kg,Groceries,Grains,GoldenHarvest,799,620,AgriPrime,365,5,2024-03-12
+SKU-OIL-01,Sunflower Oil 1L,Groceries,Oil,SunPure,169,122,SunPure,540,1,2024-02-05
+SKU-MLK-01,Whole Milk 1L,Dairy,Milk,DairyBest,62,45,DairyBest,12,1,2023-11-15
+SKU-YGT-01,Greek Yogurt 200g,Dairy,Yogurt,DairyBest,55,34,DairyBest,10,0.2,2024-01-08
+SKU-APL-01,Fresh Apple,Produce,Fruits,FarmFresh,120,72,GreenGrow,14,1,2024-01-10
+SKU-BAN-01,Banana Bunch,Produce,Fruits,FarmFresh,68,40,GreenGrow,10,1,2024-01-10
+SKU-CRM-01,Premium Ice Cream 500ml,Frozen,Ice Cream,Frosty,180,120,Frosty,180,0.5,2024-04-01
+SKU-BRD-01,Whole Wheat Bread,Bakery,Bread,BakeHouse,45,28,BakeHouse,7,0.5,2023-12-02
+SKU-TMT-01,Tomatoes 1kg,Produce,Vegetables,GreenGrow,50,30,GreenGrow,7,1,2024-01-22
+SKU-CHS-01,Cheddar Cheese 200g,Dairy,Cheese,DairyBest,165,118,DairyBest,30,0.2,2024-02-12
+SKU-EGG-01,Eggs 12 pack,Dairy,Eggs,FarmFresh,90,58,FarmFresh,21,0.6,2024-01-15
+SKU-TEA-01,Assam Tea 500g,Beverages,Tea,BrewMaster,210,140,BrewMaster,365,0.5,2023-10-18
+SKU-CFE-01,Ground Coffee 250g,Beverages,Coffee,BrewMaster,320,220,BrewMaster,365,0.25,2024-01-05
+SKU-CKI-01,Butter Cookies 200g,Snacks,Confectionery,Crunchy,95,62,Crunchy,180,0.2,2024-03-20
+SKU-NDL-01,Instant Noodles 6 pack,Snacks,Ready-to-eat,QuickBite,120,78,QuickBite,240,0.48,2024-02-26
