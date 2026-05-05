@@ -171,5 +171,18 @@ Vite hot reload errors:
 - Set the same environment variables in Vercel as in local (.env.local).
 - Ensure the Neon `DATABASE_URL` includes `?sslmode=require`.
 
+## Vercel Deployment Checklist
+1. Import the GitHub repo into Vercel.
+2. Set the following environment variables:
+	- `VITE_CLERK_PUBLISHABLE_KEY`
+	- `CLERK_SECRET_KEY`
+	- `DATABASE_URL`
+	- `VITE_API_BASE_URL` (optional)
+3. Build command: `npm run build`
+4. Output directory: `dist`
+5. Deploy and verify:
+	- Frontend loads at the Vercel URL
+	- `/api/health` returns `{ "status": "ok" }`
+
 ## License
 MIT
