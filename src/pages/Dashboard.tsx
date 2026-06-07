@@ -26,10 +26,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { deleteDecision, getCachedUserDecisions, getUserDecisions } from '@/lib/decision-store';
-import { autoAnalyze, getCachedDataSources, getDataSources } from '@/lib/bi-api';
-import type { DataSourceSummary } from '@/lib/bi-api';
-import type { Decision } from '@/types/decision';
+import { deleteDecision, getCachedUserDecisions, getUserDecisions } from '@/features/decisions/store/decision-store';
+import { autoAnalyze, getCachedDataSources, getDataSources, deleteDataSource } from '@/features/market/api/bi-api';
+import type { DataSourceSummary } from '@/features/market/api/bi-api';
+import type { Decision } from '@/features/decisions/types/decision';
 import {
   ArrowRight,
   BarChart3,
@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isDeletingSource, setIsDeletingSource] = useState<string | null>(null);
   const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
   const [selectedDataSourceId, setSelectedDataSourceId] = useState<string | null>(null);
 
@@ -113,7 +114,7 @@ export default function Dashboard() {
       setIsLoading(true);
     }
     try {
-      const data = await getUserDecisions(user.id, undefined, getToken);
+      const data = await getUserDecisions(user.id);
       setDecisions(data);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load BI analyses.';
@@ -146,7 +147,7 @@ export default function Dashboard() {
       setIsLoadingSources(true);
     }
     try {
-      const sources = await getDataSources();
+      const sources = await getDataSources(user.id);
       setDataSources(sources);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load data sources.';
@@ -184,7 +185,7 @@ export default function Dashboard() {
   };
 
   const confirmAnalyze = async () => {
-    if (!selectedDataSourceId) {
+    if (!selectedDataSourceId || !user?.id) {
       toast({
         title: 'Select a dataset',
         description: 'Choose a dataset to analyze.',
@@ -195,7 +196,7 @@ export default function Dashboard() {
 
     setIsAnalyzing(true);
     try {
-      const result = await autoAnalyze(selectedDataSourceId);
+      const result = await autoAnalyze(user.id, selectedDataSourceId);
       toast({
         title: 'Analysis complete',
         description: 'Synthetic dataset analyzed successfully.',
@@ -222,7 +223,7 @@ export default function Dashboard() {
 
     setIsDeleting(decisionId);
     try {
-      await deleteDecision(decisionId, getToken);
+      await deleteDecision(decisionId);
       setDecisions((prev) => prev.filter((item) => item.id !== decisionId));
       toast({
         title: 'Analysis removed',
@@ -237,6 +238,27 @@ export default function Dashboard() {
       });
     } finally {
       setIsDeleting(null);
+    }
+  };
+
+  const handleDeleteSource = async (sourceId: string) => {
+    setIsDeletingSource(sourceId);
+    try {
+      await deleteDataSource(sourceId);
+      setDataSources((prev) => prev.filter((item) => item.id !== sourceId));
+      toast({
+        title: 'Data source removed',
+        description: 'The dataset connection has been deleted.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete data source.';
+      toast({
+        title: 'Unable to remove source',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingSource(null);
     }
   };
 
@@ -320,7 +342,33 @@ export default function Dashboard() {
                         <p className="font-medium">{source.name}</p>
                         <p className="text-xs text-muted-foreground">Type: {source.type}</p>
                       </div>
-                      <Badge variant="secondary">{source.status}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{source.status}</Badge>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-8 w-8 p-0" disabled={isDeletingSource === source.id}>
+                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete data source?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete this data source and all its cached items. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteSource(source.id)}
+                                disabled={isDeletingSource === source.id}
+                              >
+                                {isDeletingSource === source.id ? 'Deleting...' : 'Delete'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   ))}
                 </div>

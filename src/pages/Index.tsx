@@ -1,7 +1,7 @@
 import { LandingHeader } from "@/components/layout/LandingHeader";
-import { Hero } from "@/components/landing/Hero";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { CTA } from "@/components/landing/CTA";
+import { Hero } from "@/features/landing/components/Hero";
+import { HowItWorks } from "@/features/landing/components/HowItWorks";
+import { CTA } from "@/features/landing/components/CTA";
 import { Footer } from "@/components/layout/Footer";
 
 const Index = () => {

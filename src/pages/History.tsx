@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { useAuth, useUser } from "@clerk/react";
-import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useUser } from '@clerk/react';
+import { DashboardSidebar } from '@/components/layout/DashboardSidebar';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -24,23 +24,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Calendar, Archive, Trash2 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { deleteDecision, getUserDecisions } from "@/lib/decision-store";
-import { getCachedDataSources, getDataSources, getMarketMetricsForSource } from "@/lib/bi-api";
-import { getCachedMarketHistory, loadMarketHistory } from "@/lib/market-metrics";
-import type { Decision } from "@/types/decision";
-import type { MarketHistory } from "@/lib/market-metrics";
-import type { MarketMetrics } from "@/lib/market-metrics";
-import type { DataSourceSummary } from "@/lib/bi-api";
+} from '@/components/ui/table';
+import { Calendar, Archive, Trash2 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { deleteDecision, getUserDecisions } from '@/features/decisions/store/decision-store';
+import { getCachedDataSources, getDataSources, getMarketMetricsForSource } from '@/features/market/api/bi-api';
+import { getCachedMarketHistory, loadMarketHistory } from '@/features/market/utils/market-metrics';
+import type { Decision } from '@/features/decisions/types/decision';
+import type { MarketHistory } from '@/features/market/utils/market-metrics';
+import type { MarketMetrics } from '@/features/market/utils/market-metrics';
+import type { DataSourceSummary } from '@/features/market/api/bi-api';
 
 export default function History() {
   const { toast } = useToast();
   const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -49,20 +48,20 @@ export default function History() {
   const [metricsBySource, setMetricsBySource] = useState<Record<string, MarketMetrics>>({});
   const [metricsLoadingBySource, setMetricsLoadingBySource] = useState<Record<string, boolean>>({});
   const [metricsErrorBySource, setMetricsErrorBySource] = useState<Record<string, string>>({});
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [datasetFilter, setDatasetFilter] = useState<string>("all");
-  const [timeFilter, setTimeFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"timeline" | "feed" | "metrics">("timeline");
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [datasetFilter, setDatasetFilter] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'timeline' | 'feed' | 'metrics'>('timeline');
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
-  const cachedHistory = getCachedMarketHistory("dataset1", 3);
+  const cachedHistory = getCachedMarketHistory('dataset1', 3);
   const [historyMetrics, setHistoryMetrics] = useState<MarketHistory | null>(cachedHistory);
   const [historyLoading, setHistoryLoading] = useState(!cachedHistory);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const currencyFormatter = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
+  const currencyFormatter = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
     maximumFractionDigits: 0,
   });
 
@@ -82,14 +81,13 @@ export default function History() {
     const cachedSources = getCachedDataSources();
     if (cachedSources) {
       setDataSources(cachedSources);
-      setIsLoadingSources(false);
     }
 
     try {
-      const sources = await getDataSources();
-      setDataSources(sources);
+      const fresh = await getDataSources(user.id);
+      setDataSources(fresh);
     } catch (error) {
-      console.error("Error loading data sources:", error);
+      console.error('Error refreshing data sources:', error);
     } finally {
       setIsLoadingSources(false);
     }
@@ -104,14 +102,14 @@ export default function History() {
           setHistoryLoading(true);
         }
         setHistoryError(null);
-        const data = await loadMarketHistory("dataset1", 3);
+        const data = await loadMarketHistory('dataset1', 3);
         if (isMounted) {
           setHistoryMetrics(data);
         }
       } catch (error) {
-        console.error("Error loading history metrics:", error);
+        console.error('Error loading history metrics:', error);
         if (isMounted) {
-          setHistoryError("Unable to load synthetic history metrics.");
+          setHistoryError('Unable to load synthetic history metrics.');
         }
       } finally {
         if (isMounted) {
@@ -135,18 +133,18 @@ export default function History() {
 
     try {
       setIsLoading(true);
-      const data = await getUserDecisions(user.id, {}, getToken);
+      const data = await getUserDecisions(user.id);
       // Sort by date, newest first
       const sorted = data.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setDecisions(sorted);
     } catch (error) {
-      console.error("Error loading decisions:", error);
+      console.error('Error loading decisions:', error);
       toast({
-        title: "Error",
-        description: "Failed to load decision history. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load decision history. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -174,10 +172,10 @@ export default function History() {
           const metrics = await getMarketMetricsForSource(id);
           setMetricsBySource((prev) => ({ ...prev, [id]: metrics }));
         } catch (error) {
-          console.error("Error loading dataset metrics:", error);
+          console.error('Error loading dataset metrics:', error);
           setMetricsErrorBySource((prev) => ({
             ...prev,
-            [id]: "Unable to load metrics",
+            [id]: 'Unable to load metrics',
           }));
         } finally {
           setMetricsLoadingBySource((prev) => ({ ...prev, [id]: false }));
@@ -193,18 +191,18 @@ export default function History() {
 
     setIsDeleting(decisionId);
     try {
-      await deleteDecision(decisionId, getToken);
+      await deleteDecision(decisionId);
       setDecisions((prev) => prev.filter((item) => item.id !== decisionId));
       toast({
-        title: "Analysis removed",
-        description: "The analysis has been deleted.",
+        title: 'Analysis removed',
+        description: 'The analysis has been deleted.',
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to remove analysis.";
+      const message = error instanceof Error ? error.message : 'Failed to remove analysis.';
       toast({
-        title: "Unable to remove analysis",
+        title: 'Unable to remove analysis',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsDeleting(null);
@@ -225,17 +223,17 @@ export default function History() {
     const query = searchQuery.trim().toLowerCase();
     const now = Date.now();
     const cutoffMap: Record<string, number> = {
-      "7d": now - 7 * 24 * 60 * 60 * 1000,
-      "30d": now - 30 * 24 * 60 * 60 * 1000,
-      "90d": now - 90 * 24 * 60 * 60 * 1000,
+      '7d': now - 7 * 24 * 60 * 60 * 1000,
+      '30d': now - 30 * 24 * 60 * 60 * 1000,
+      '90d': now - 90 * 24 * 60 * 60 * 1000,
     };
     const cutoff = cutoffMap[timeFilter];
 
     return decisions.filter((decision) => {
-      if (statusFilter !== "all" && decision.status !== statusFilter) {
+      if (statusFilter !== 'all' && decision.status !== statusFilter) {
         return false;
       }
-      if (datasetFilter !== "all" && decision.data_source_id !== datasetFilter) {
+      if (datasetFilter !== 'all' && decision.data_source_id !== datasetFilter) {
         return false;
       }
       if (cutoff) {
@@ -253,7 +251,7 @@ export default function History() {
   const groupedDecisions = useMemo(() => {
     const groups = new Map<string, Decision[]>();
     filteredDecisions.forEach((decision) => {
-      const key = decision.data_source_id || "unlinked";
+      const key = decision.data_source_id || 'unlinked';
       const bucket = groups.get(key) ?? [];
       bucket.push(decision);
       groups.set(key, bucket);
@@ -262,8 +260,8 @@ export default function History() {
       items.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     );
     return Array.from(groups.entries()).sort(([a], [b]) => {
-      const nameA = a === "unlinked" ? "Unlinked" : dataSourceNameById.get(a) || a;
-      const nameB = b === "unlinked" ? "Unlinked" : dataSourceNameById.get(b) || b;
+      const nameA = a === 'unlinked' ? 'Unlinked' : dataSourceNameById.get(a) || a;
+      const nameB = b === 'unlinked' ? 'Unlinked' : dataSourceNameById.get(b) || b;
       return nameA.localeCompare(nameB);
     });
   }, [filteredDecisions, dataSourceNameById]);
@@ -286,8 +284,8 @@ export default function History() {
   const getKpiSummary = (decision: Decision) => {
     const metrics = getDecisionMetrics(decision);
     if (!metrics) return null;
-    const topCategory = metrics.revenueByCategory?.[0]?.category || "-";
-    const topProduct = metrics.topProducts?.[0]?.name || "-";
+    const topCategory = metrics.revenueByCategory?.[0]?.category || '-';
+    const topProduct = metrics.topProducts?.[0]?.name || '-';
     return {
       marginPct: metrics.kpis.profitMarginPct,
       lowStock: metrics.kpis.lowStockCount,
@@ -392,31 +390,31 @@ export default function History() {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <Button
                     size="sm"
-                    variant={viewMode === "timeline" ? "default" : "outline"}
-                    onClick={() => setViewMode("timeline")}
+                    variant={viewMode === 'timeline' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('timeline')}
                   >
                     Timeline
                   </Button>
                   <Button
                     size="sm"
-                    variant={viewMode === "feed" ? "default" : "outline"}
-                    onClick={() => setViewMode("feed")}
+                    variant={viewMode === 'feed' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('feed')}
                   >
                     Feed
                   </Button>
                   <Button
                     size="sm"
-                    variant={viewMode === "metrics" ? "default" : "outline"}
-                    onClick={() => setViewMode("metrics")}
+                    variant={viewMode === 'metrics' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('metrics')}
                   >
                     Metrics
                   </Button>
                   <Button
                     size="sm"
-                    variant={compareEnabled ? "default" : "outline"}
+                    variant={compareEnabled ? 'default' : 'outline'}
                     onClick={() => setCompareEnabled((prev) => !prev)}
                   >
-                    {compareEnabled ? "Compare on" : "Compare"}
+                    {compareEnabled ? 'Compare on' : 'Compare'}
                   </Button>
                 </div>
                 {!isLoading && filteredDecisions.length > 0 && (
@@ -440,9 +438,9 @@ export default function History() {
                 {historyMetrics && !historyLoading ? (
                   <div className="mt-4 space-y-3">
                     {historyMetrics.months.map((month) => {
-                      const label = new Date(`${month.month}-01`).toLocaleString("en-IN", {
-                        month: "short",
-                        year: "numeric",
+                      const label = new Date(`${month.month}-01`).toLocaleString('en-IN', {
+                        month: 'short',
+                        year: 'numeric',
                       });
                       return (
                         <div key={month.month} className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -495,12 +493,12 @@ export default function History() {
                     <Archive className="h-8 w-8 text-muted-foreground" />
                   </div>
                   <h3 className="font-semibold text-lg mb-2">
-                    {searchQuery ? "No matching decisions" : "No decision history"}
+                    {searchQuery ? 'No matching decisions' : 'No decision history'}
                   </h3>
                   <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
                     {searchQuery
-                      ? "Try adjusting your search."
-                      : "Your decision history will appear here once you run auto-analysis."}
+                      ? 'Try adjusting your search.'
+                      : 'Your decision history will appear here once you run auto-analysis.'}
                   </p>
                 </div>
               ) : (
@@ -531,10 +529,10 @@ export default function History() {
                                 <Badge variant="secondary">{decision.status}</Badge>
                               </div>
                               <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                                <div>Margin: {metrics ? `${metrics.marginPct}%` : "-"}</div>
-                                <div>Low stock: {metrics ? metrics.lowStock : "-"}</div>
-                                <div>Top category: {metrics?.topCategory ?? "-"}</div>
-                                <div>Top product: {metrics?.topProduct ?? "-"}</div>
+                                <div>Margin: {metrics ? `${metrics.marginPct}%` : '-'}</div>
+                                <div>Low stock: {metrics ? metrics.lowStock : '-'}</div>
+                                <div>Top category: {metrics?.topCategory ?? '-'}</div>
+                                <div>Top product: {metrics?.topProduct ?? '-'}</div>
                               </div>
                             </div>
                           );
@@ -543,11 +541,11 @@ export default function History() {
                     </section>
                   ) : null}
 
-                  {viewMode === "timeline" ? (
+                  {viewMode === 'timeline' ? (
                     <section className="space-y-4">
                       {groupedDecisions.map(([datasetId, items]) => {
-                        const datasetName = datasetId === "unlinked"
-                          ? "Unlinked"
+                        const datasetName = datasetId === 'unlinked'
+                          ? 'Unlinked'
                           : dataSourceNameById.get(datasetId) || datasetId;
                         return (
                           <div key={datasetId} className="rounded-2xl border bg-card p-5 card-elevated">
@@ -604,7 +602,7 @@ export default function History() {
                                                 onClick={() => handleDelete(decision.id)}
                                                 disabled={isDeleting === decision.id}
                                               >
-                                                {isDeleting === decision.id ? "Removing..." : "Remove"}
+                                                {isDeleting === decision.id ? 'Removing...' : 'Remove'}
                                               </AlertDialogAction>
                                             </AlertDialogFooter>
                                           </AlertDialogContent>
@@ -615,10 +613,10 @@ export default function History() {
                                       </div>
                                     </div>
                                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                                      <div>Margin: {metrics ? `${metrics.marginPct}%` : "-"}</div>
-                                      <div>Low stock: {metrics ? metrics.lowStock : "-"}</div>
-                                      <div>Top category: {metrics?.topCategory ?? "-"}</div>
-                                      <div>Top product: {metrics?.topProduct ?? "-"}</div>
+                                      <div>Margin: {metrics ? `${metrics.marginPct}%` : '-'}</div>
+                                      <div>Low stock: {metrics ? metrics.lowStock : '-'}</div>
+                                      <div>Top category: {metrics?.topCategory ?? '-'}</div>
+                                      <div>Top product: {metrics?.topProduct ?? '-'}</div>
                                     </div>
                                   </div>
                                 );
@@ -630,7 +628,7 @@ export default function History() {
                     </section>
                   ) : null}
 
-                  {viewMode === "feed" ? (
+                  {viewMode === 'feed' ? (
                     <section className="space-y-3">
                       {orderedDecisions.map((decision) => {
                         const metrics = getKpiSummary(decision);
@@ -655,8 +653,8 @@ export default function History() {
                                 Updated {formatDistanceToNow(new Date(decision.updated_at), { addSuffix: true })}
                               </div>
                               <div className="mt-2 text-xs text-muted-foreground">
-                                Margin {metrics ? `${metrics.marginPct}%` : "-"} · Low stock {metrics ? metrics.lowStock : "-"} ·
-                                Top category {metrics?.topCategory ?? "-"} · Top product {metrics?.topProduct ?? "-"}
+                                Margin {metrics ? `${metrics.marginPct}%` : '-'} · Low stock {metrics ? metrics.lowStock : '-'} ·
+                                Top category {metrics?.topCategory ?? '-'} · Top product {metrics?.topProduct ?? '-'}
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -670,7 +668,7 @@ export default function History() {
                     </section>
                   ) : null}
 
-                  {viewMode === "metrics" ? (
+                  {viewMode === 'metrics' ? (
                     <section className="rounded-2xl border bg-card p-5 card-elevated">
                       <Table>
                         <TableHeader>
@@ -705,10 +703,10 @@ export default function History() {
                                   </div>
                                 </TableCell>
                                 <TableCell className="capitalize">{decision.status}</TableCell>
-                                <TableCell>{metrics ? `${metrics.marginPct}%` : "-"}</TableCell>
-                                <TableCell>{metrics ? metrics.lowStock : "-"}</TableCell>
-                                <TableCell>{metrics?.topCategory ?? "-"}</TableCell>
-                                <TableCell>{metrics?.topProduct ?? "-"}</TableCell>
+                                <TableCell>{metrics ? `${metrics.marginPct}%` : '-'}</TableCell>
+                                <TableCell>{metrics ? metrics.lowStock : '-'}</TableCell>
+                                <TableCell>{metrics?.topCategory ?? '-'}</TableCell>
+                                <TableCell>{metrics?.topProduct ?? '-'}</TableCell>
                                 <TableCell>{new Date(decision.updated_at).toLocaleDateString()}</TableCell>
                               </TableRow>
                             );

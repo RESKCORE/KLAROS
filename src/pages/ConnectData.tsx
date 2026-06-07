@@ -4,14 +4,14 @@ import { DashboardSidebar } from '@/components/layout/DashboardSidebar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Database, Sparkles } from 'lucide-react';
+import { AlertCircle, Database, RefreshCw, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { connectSyntheticData, uploadDataset } from '@/lib/bi-api';
+import { connectSyntheticData, uploadDataset } from '@/features/market/api/bi-api';
 
 export default function ConnectData() {
   const { toast } = useToast();
-  const { isLoaded, user } = useUser();
-  const [isConnecting, setIsConnecting] = useState(false);
+  const { user } = useUser();
+  const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [datasetName, setDatasetName] = useState('Custom Dataset');
   const [productsFile, setProductsFile] = useState<File | null>(null);
@@ -19,91 +19,58 @@ export default function ConnectData() {
   const [stockFile, setStockFile] = useState<File | null>(null);
   const [investmentsFile, setInvestmentsFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleConnect = async () => {
-    if (!isLoaded || !user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to connect data sources.',
-        variant: 'destructive',
-      });
+  const handleConnect = async (datasetId: 'dataset1' | 'dataset2') => {
+    if (!user) {
+      toast({ title: 'Sign in required', description: 'Please sign in to connect data sources.', variant: 'destructive' });
       return;
     }
 
-    setIsConnecting(true);
+    setIsConnecting(datasetId);
     try {
-      await connectSyntheticData();
-      setConnected(true);
-      toast({
-        title: 'Synthetic dataset connected',
-        description: 'You can now run auto-analysis from the dashboard.',
-      });
+      const result = await connectSyntheticData(user.id, datasetId);
+      if (result.ok) {
+        setConnected(true);
+        toast({ title: 'Synthetic dataset connected', description: 'You can now run auto-analysis from the dashboard.' });
+      }
     } catch (error) {
-      const raw = error instanceof Error ? error.message : 'Failed to connect dataset.';
-      const message = raw === 'token_expired'
-        ? 'Session expired. Please log in again.'
-        : raw === 'no_auth_token'
-          ? 'Session missing. Please log in again.'
-          : raw;
-      toast({
-        title: 'Connection failed',
-        description: message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Connection failed', description: error instanceof Error ? error.message : 'Failed to connect.', variant: 'destructive' });
     } finally {
-      setIsConnecting(false);
+      setIsConnecting(null);
     }
   };
 
   const handleUpload = async () => {
-    if (!isLoaded || !user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to upload datasets.',
-        variant: 'destructive',
-      });
+    if (!user) {
+      toast({ title: 'Sign in required', description: 'Please sign in to upload datasets.', variant: 'destructive' });
       return;
     }
 
     if (!productsFile || !salesFile || !stockFile || !investmentsFile) {
-      toast({
-        title: 'Missing files',
-        description: 'Upload products, sales, stock, and investments files before continuing.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Missing files', description: 'Upload all four files before continuing.', variant: 'destructive' });
       return;
     }
 
     setIsUploading(true);
+    setUploadError(null);
     try {
-      await uploadDataset({
+      await uploadDataset(user.id, {
         datasetName: datasetName.trim() || 'Custom Dataset',
         products: productsFile,
         sales: salesFile,
         stock: stockFile,
         investments: investmentsFile,
       });
-
-      toast({
-        title: 'Dataset uploaded',
-        description: 'Your dataset is now connected and ready for analysis.',
-      });
+      toast({ title: 'Dataset uploaded', description: 'Your dataset is now connected and ready for analysis.' });
       setProductsFile(null);
       setSalesFile(null);
       setStockFile(null);
       setInvestmentsFile(null);
     } catch (error) {
-      const raw = error instanceof Error ? error.message : 'Failed to upload dataset.';
-      const message = raw === 'token_expired'
-        ? 'Session expired. Please log in again.'
-        : raw === 'no_auth_token'
-          ? 'Session missing. Please log in again.'
-          : raw;
-      toast({
-        title: 'Upload failed',
-        description: message,
-        variant: 'destructive',
-      });
+      const message = error instanceof Error ? error.message : 'Failed to upload.';
+      setUploadError(message);
+      toast({ title: 'Upload failed', description: message, variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -118,7 +85,7 @@ export default function ConnectData() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold">Connect Your Data</h1>
             <p className="text-muted-foreground">
-              Prototype mode uses a synthetic supermarket dataset to power BI analysis.
+              Use the synthetic supermarket dataset or upload your own CSV files.
             </p>
           </div>
 
@@ -142,9 +109,13 @@ export default function ConnectData() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleConnect} disabled={isConnecting || connected || !isLoaded}>
+              <Button onClick={() => handleConnect('dataset1')} disabled={isConnecting !== null || connected} variant="default">
                 <Sparkles className="h-4 w-4 mr-2" />
-                {connected ? 'Ready for Auto-Analyze' : isConnecting ? 'Connecting...' : 'Connect & Load Data'}
+                {isConnecting === 'dataset1' ? 'Connecting...' : 'Connect Dataset 1'}
+              </Button>
+              <Button onClick={() => handleConnect('dataset2')} disabled={isConnecting !== null || connected} variant="secondary">
+                <Sparkles className="h-4 w-4 mr-2" />
+                {isConnecting === 'dataset2' ? 'Connecting...' : 'Connect Dataset 2'}
               </Button>
             </div>
           </Card>
@@ -206,10 +177,31 @@ export default function ConnectData() {
               discount, payment_method, store_city, reorder_point, expected_roi, actual_roi, etc.).
             </div>
 
+            {uploadError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-red-800">AI processing failed</p>
+                    <p className="text-red-700">{uploadError}</p>
+                    <p className="text-red-600 text-xs">
+                      Please verify your files have the required columns (sku, name, category, price, revenue, etc.) and try again. If the issue persists, try using the synthetic dataset instead.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleUpload} disabled={isUploading || !isLoaded}>
+              <Button onClick={handleUpload} disabled={isUploading}>
                 {isUploading ? 'Uploading...' : 'Upload Dataset'}
               </Button>
+              {uploadError && (
+                <Button variant="outline" onClick={() => { setUploadError(null); setDatasetName('Custom Dataset'); }}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              )}
             </div>
           </Card>
         </main>
