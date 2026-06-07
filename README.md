@@ -56,7 +56,7 @@ graph TD
     F -->|Analyze Top Products & KPIs| G[Generate 3 Options & Criteria Weights]
     G -->|Save MCDA Decision to Supabase| H[Decision Results Page]
     H -->|Render KPI Cards & Recharts| I[Interactive Dashboard Controls]
-    I -->|What-If Sliders / Chatbot Q&A| J[Actionable Retail Business Plan]
+    I -->|Interactive Category Pills & Chatbot Q&A| J[Actionable Retail Business Plan]
 ```
 
 ### 1. Data Connection & Sync
@@ -74,7 +74,7 @@ graph TD
 
 ### 4. Interactive Analysis & Chatbot Q&A
 - The results page displays the report dashboard.
-- Users can adjust criteria weights using **What-If Sliders** to dynamically re-evaluate rankings.
+- Users can filter and explore metrics by category using interactive pills to dynamically update sales and margin summaries.
 - A floating **Klaros AI Companion** (chatbot) is loaded on the page to answer conversational questions about category sales, top products, and inventory.
 
 ---
@@ -88,8 +88,6 @@ graph TD
 - **AI Actionable Insights Grid**: Executive narratives, impact-badged opportunities, risk alerts, and anomaly detectors compiled dynamically by Gemini.
 - **AI Revenue Forecast**: A 3-month extrapolated line chart visualizer plotted side-by-side with historical sales.
 - **Klaros AI Companion**: Floating chatbot assistant that provides conversational Q&A over the active dataset metrics.
-- **What-If Sliders**: Interactive Radix-slider controls for tweaking MCDA criteria weights in real-time.
-- **PDF Report Builder**: Instant download button to compile the visual reports and metrics grid into a clean PDF via jsPDF.
 
 ---
 
@@ -107,7 +105,6 @@ graph TD
 | **Auth** | Identity | **Clerk SDK v6** | Secure registration, sessions, and JWTs |
 | **Database** | Database | **Supabase (PostgreSQL)** | Persistent storage with custom policies |
 | **AI** | Model | **Google Gemini 2.5 Flash** | Multi-Criteria Decision Analysis (MCDA) |
-| **Export** | PDF Generator | **jsPDF + AutoTable** | Client-side vector report export |
 | | Data Parsers | **PapaParse + XLSX** | Large CSV and Excel sheet processing |
 
 ---
@@ -144,10 +141,7 @@ src/
 │   ├── auth/                      # Routing auth guards
 │   ├── layout/
 │   │   └── DashboardSidebar.tsx   # Core sidebar navigation
-│   ├── ui/                        # Radix primitives styled via shadcn/ui
-│   └── results/                   # Sub-widgets for MCDA Results
-│       ├── WhatIfSliders.tsx      # Recalculates decision priority on slider shift
-│       └── PDFExport.ts           # Orchestrates PDF builds
+│   └── ui/                        # Radix primitives styled via shadcn/ui
 │
 ├── features/
 │   ├── auth/                      # Auth wrappers and Clerk context providers
