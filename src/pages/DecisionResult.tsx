@@ -467,7 +467,7 @@ export default function DecisionResult() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           
           {/* Card 1: Total Revenue */}
-          <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow relative overflow-hidden flex flex-col justify-between h-36">
+          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
             <div className="flex items-start justify-between">
               <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
                 <IndianRupee className="h-5 w-5" />
@@ -486,7 +486,7 @@ export default function DecisionResult() {
           </Card>
 
           {/* Card 2: Total Units Sold */}
-          <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow relative overflow-hidden flex flex-col justify-between h-36">
+          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
             <div className="flex items-start justify-between">
               <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                 <Package className="h-5 w-5" />
@@ -505,7 +505,7 @@ export default function DecisionResult() {
           </Card>
 
           {/* Card 3: Low Stock SKUs */}
-          <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow relative overflow-hidden flex flex-col justify-between h-36">
+          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
             <div className="flex items-start justify-between">
               <div className="h-10 w-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
                 <Tag className="h-5 w-5" />
@@ -524,7 +524,7 @@ export default function DecisionResult() {
           </Card>
 
           {/* Card 4: Net Profit */}
-          <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-shadow relative overflow-hidden flex flex-col justify-between h-36">
+          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
             <div className="flex items-start justify-between">
               <div className="h-10 w-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600">
                 <Activity className="h-5 w-5" />
@@ -547,7 +547,7 @@ export default function DecisionResult() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           
           {/* Left Block: Report Analytics (2/3 Column) */}
-          <Card className="lg:col-span-2 rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-col justify-between gap-6">
+          <Card className="lg:col-span-2 rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col justify-between gap-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
@@ -581,21 +581,31 @@ export default function DecisionResult() {
             </div>
 
             {/* Bar chart with custom colored cells */}
-            <div className="h-64">
+            <div className="h-64 mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={metrics.revenueByCategory.slice(0, 6)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    {metrics.revenueByCategory.slice(0, 6).map((entry, index) => (
+                      <linearGradient key={`colorUv-${index}`} id={`colorUv-${index}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={getCategoryColor(entry.category)} stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor={getCategoryColor(entry.category)} stopOpacity={0.4}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                  <XAxis dataKey="category" tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <XAxis dataKey="category" padding={{ left: 20, right: 20 }} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v} />
-                  <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v: number) => currencyFormatter.format(v)} />
-                  <Bar dataKey="revenue" radius={[8, 8, 0, 0]} barSize={26}>
+                  <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v: number) => currencyFormatter.format(v)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                  <Bar dataKey="revenue" radius={[6, 6, 0, 0]} barSize={32}>
                     {metrics.revenueByCategory.slice(0, 6).map((entry, index) => {
                       const isSelected = selectedCategory === 'All' || entry.category === selectedCategory;
                       return (
                         <Cell
                           key={`cell-${index}`}
-                          fill={getCategoryColor(entry.category)}
-                          fillOpacity={isSelected ? 1 : 0.25}
+                          fill={`url(#colorUv-${index})`}
+                          fillOpacity={isSelected ? 1 : 0.3}
+                          stroke={isSelected ? getCategoryColor(entry.category) : 'none'}
+                          strokeWidth={isSelected ? 1 : 0}
                         />
                       );
                     })}
@@ -628,7 +638,7 @@ export default function DecisionResult() {
           </Card>
 
           {/* Right Block: Top Products (1/3 Column) */}
-          <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-col gap-4">
+          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
@@ -689,15 +699,98 @@ export default function DecisionResult() {
           </div>
         )}
 
-        {/* ── Bottom Section: AI narrative, Opportunities, Forecasts ── */}
+        {/* ── Bottom Section: Forecasts, AI narrative, Opportunities ── */}
         {(aiAnalytics || aiAnalyticsLoading) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             
-            {/* Left AI Insights Block (2/3 Column) */}
-            <div className="lg:col-span-2 space-y-6">
-              
+            {/* Top Revenue Forecast Block (Full Width) */}
+            <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col gap-6">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+                      <TrendingUp className="h-4 w-4" />
+                    </div>
+                    <CardTitle className="text-base font-semibold text-slate-850">AI Revenue Forecast</CardTitle>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Trend-based 3-month forward projection from historical transactions.
+                </p>
+              </div>
+
+              {aiAnalyticsLoading && !aiAnalytics ? (
+                <div className="w-full h-[350px] flex items-center justify-center bg-slate-50/50 rounded-2xl animate-pulse">
+                  <p className="text-xs text-slate-400">AI projecting forecasts...</p>
+                </div>
+              ) : (
+                <div className="w-full h-[350px]">
+                  {aiAnalytics?.forecasts && aiAnalytics.forecasts.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={forecastChartData} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                        <XAxis 
+                          dataKey="date" 
+                          padding={{ left: 30, right: 30 }} 
+                          tickLine={false} 
+                          axisLine={false} 
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 500 }} 
+                          minTickGap={30}
+                        />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v} />
+                        <Tooltip
+                          formatter={(value: number, name: string) =>
+                            name === "revenue"
+                              ? [currencyFormatter.format(value), "Actual Revenue"]
+                              : [currencyFormatter.format(value), "AI Forecast"]
+                          }
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                        />
+                        <ReferenceLine
+                          x={aiAnalytics.forecasts[0]?.month}
+                          stroke="#94a3b8"
+                          strokeDasharray="3 3"
+                          label={{ value: 'Future Forecast', position: 'insideTopLeft', fill: '#64748b', fontSize: 10, fontWeight: 600 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="forecastedRevenue"
+                          stroke="#f59e0b"
+                          strokeWidth={3}
+                          strokeDasharray="6 6"
+                          dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center bg-slate-50/50 rounded-2xl border border-slate-100">
+                      <p className="text-xs text-slate-400 text-center px-4">Forecast model needs at least 3 months of history to extrapolate.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Executive Summary Narrative */}
-              <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)]">
+              <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] h-full">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="h-5 w-5 text-blue-600" />
                   <CardTitle className="text-base font-semibold text-slate-850">AI Executive Summary</CardTitle>
@@ -716,18 +809,18 @@ export default function DecisionResult() {
               </Card>
 
               {/* AI opportunities panel */}
-              <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)]">
+              <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] h-full">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                   <CardTitle className="text-base font-semibold text-slate-850">AI Actionable Opportunities</CardTitle>
                 </div>
                 {aiAnalyticsLoading && !aiAnalytics ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="h-20 bg-slate-100 rounded-xl animate-pulse" />
                     <div className="h-20 bg-slate-100 rounded-xl animate-pulse" />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     {aiAnalytics?.opportunities && aiAnalytics.opportunities.length > 0 ? (
                       aiAnalytics.opportunities.map((opp, idx) => (
                         <div key={idx} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-slate-50 transition-colors flex flex-col justify-between">
@@ -745,17 +838,19 @@ export default function DecisionResult() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 col-span-2">No actionable opportunities identified.</p>
+                      <p className="text-xs text-slate-400">No actionable opportunities identified.</p>
                     )}
                   </div>
                 )}
               </Card>
+            </div>
 
-              {/* Risk alerts & anomalies */}
-              {(aiAnalytics?.riskAlerts?.length || aiAnalytics?.anomalies?.length) ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {/* Risks Card */}
-                  <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)]">
+            {/* Risk alerts & anomalies */}
+            {(aiAnalytics?.riskAlerts?.length || aiAnalytics?.anomalies?.length) ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Risks Card */}
+                {aiAnalytics?.riskAlerts?.length ? (
+                  <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] h-full">
                     <div className="flex items-center gap-2 mb-4">
                       <ShieldAlert className="h-5 w-5 text-rose-500" />
                       <CardTitle className="text-base font-semibold text-slate-850">AI Risk Alerts</CardTitle>
@@ -772,9 +867,11 @@ export default function DecisionResult() {
                       ))}
                     </div>
                   </Card>
+                ) : <div />}
 
-                  {/* Anomalies Card */}
-                  <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)]">
+                {/* Anomalies Card */}
+                {aiAnalytics?.anomalies?.length ? (
+                  <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] h-full">
                     <div className="flex items-center gap-2 mb-4">
                       <Zap className="h-5 w-5 text-violet-600" />
                       <CardTitle className="text-base font-semibold text-slate-850">AI Anomalies</CardTitle>
@@ -791,79 +888,9 @@ export default function DecisionResult() {
                       ))}
                     </div>
                   </Card>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Right Revenue Forecast Block (1/3 Column) */}
-            <Card className="rounded-3xl border-0 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.01)] flex flex-col h-full gap-6">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                      <TrendingUp className="h-4 w-4" />
-                    </div>
-                    <CardTitle className="text-base font-semibold text-slate-850">AI Revenue Forecast</CardTitle>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Trend-based 3-month forward projection from historical transactions.
-                </p>
+                ) : <div />}
               </div>
-
-              {aiAnalyticsLoading && !aiAnalytics ? (
-                <div className="flex-1 min-h-[300px] flex items-center justify-center bg-slate-50/50 rounded-2xl animate-pulse">
-                  <p className="text-xs text-slate-400">AI projecting forecasts...</p>
-                </div>
-              ) : (
-                <div className="flex-1 min-h-[300px] w-full">
-                  {aiAnalytics?.forecasts && aiAnalytics.forecasts.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={forecastChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                        <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v} />
-                        <Tooltip
-                          formatter={(value: number, name: string) =>
-                            name === "revenue"
-                              ? [currencyFormatter.format(value), "Actual Revenue"]
-                              : [currencyFormatter.format(value), "AI Forecast"]
-                          }
-                          contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
-                        />
-                        <ReferenceLine
-                          x={aiAnalytics.forecasts[0]?.month}
-                          stroke="#cbd5e1"
-                          strokeDasharray="4 4"
-                          label={{ value: 'Forecast', position: 'insideTopRight', fill: '#94a3b8', fontSize: 9 }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="revenue"
-                          stroke="#3b82f6"
-                          strokeWidth={2.5}
-                          dot={false}
-                          connectNulls
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="forecastedRevenue"
-                          stroke="#f59e0b"
-                          strokeWidth={2.5}
-                          strokeDasharray="5 5"
-                          dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }}
-                          connectNulls
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full min-h-[300px] flex items-center justify-center bg-slate-50/50 rounded-2xl border border-slate-100">
-                      <p className="text-xs text-slate-400 text-center px-4">Forecast model needs at least 3 months of history to extrapolate.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
+            ) : null}
           </div>
         )}
       </main>

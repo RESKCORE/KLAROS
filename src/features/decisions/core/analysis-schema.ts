@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
+export const ComparisonTripleSchema = z.tuple([z.number(), z.number(), z.number()]);
+
 // Schema for raw LLM MCDA response (before post-processing)
+// The LLM now outputs pairwise comparisons instead of guessed weights/scores.
+// The AHP math engine converts these comparisons into rigorous weights and scores.
 export const McdaRawResponseSchema = z.object({
   title: z.string().optional().catch(undefined),
   context: z.string().optional().catch(undefined),
@@ -12,8 +16,11 @@ export const McdaRawResponseSchema = z.object({
   criteria: z.array(z.object({
     id: z.string(),
     name: z.string(),
-    weight: z.number(),
+    weight: z.number().optional(),
   })).optional().catch(undefined),
+  // AHP pairwise comparisons using Saaty's 1-9 scale
+  criteriaComparisons: ComparisonTripleSchema.optional().catch(undefined),
+  optionComparisons: z.array(ComparisonTripleSchema).optional().catch(undefined),
   recommendation: z.string().optional().catch(undefined),
   confidence: z.number().min(0).max(100).optional().catch(undefined),
   reasoning: z.object({

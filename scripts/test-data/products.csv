@@ -1,0 +1,5 @@
+sku,name,category,subcategory,brand,price,cost,supplier
+SKU001,Premium Golden Widget,Electronics,Widgets,LuxuryBrand,50000,45000,TechSupplier
+SKU002,Cheap Plastic Thing,Toys,Trinkets,GenericBrand,10,1,CheapCo
+SKU003,Standard Cable,Electronics,Accessories,BasicBrand,500,250,TechSupplier
+SKU004,Exploding Battery,Electronics,Power,BadBrand,1000,1500,ScamSupplier

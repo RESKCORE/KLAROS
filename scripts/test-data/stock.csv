@@ -1,0 +1,5 @@
+sku,date,quantity,beginning_stock,units_sold,reorder_point,supplier_lead_time
+SKU001,2023-10-01,0,1,1,5,30
+SKU002,2023-10-01,500000,515000,15000,10000,5
+SKU003,2023-10-01,100,120,20,50,10
+SKU004,2023-10-01,0,5,5,100,15

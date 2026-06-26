@@ -1,4 +1,5 @@
 import { McdaRawResponseSchema, type McdaRawResponse } from '@/features/decisions/core/analysis-schema';
+import { ahpSynthesis } from '@/features/decisions/core/ahp-math';
 import type { MarketMetrics } from '@/features/market/utils/market-metrics';
 
 // ─── Provider Detection ───────────────────────────────────────────────────────
@@ -568,19 +569,34 @@ Then restart: npm run dev
   }
 
   const maxRetries = 2;
-  const prompt = `You are a BI AI for an Indian retail business. Perform a Multi-Criteria Decision Analysis (MCDA) on the retail business data below.
+  const prompt = `You are a BI AI for an Indian retail business. Perform a Multi-Criteria Decision Analysis (MCDA) using the Analytic Hierarchy Process (AHP) on the retail business data below.
 
 Data: ${metricsJson}
 
-Rules:
-- Create exactly 3 options and 3 criteria derived from the actual data
-- Weights must sum to 1.0
-- Scores must be 0-100
-- confidence must be 0-100 (your certainty in the recommendation based on data quality)
-- CURRENCY: Always use ₹ (Indian Rupee) for any monetary amounts — never $ or USD. Use Indian notation (lakhs/crores) for large numbers.
-- Return ONLY valid JSON — no markdown, no code fences, no explanations
-- Every string must be properly quoted and closed
-- The response must be a single, complete JSON object
+RULES:
+1. Create exactly 3 strategic options and 3 evaluation criteria derived from the actual data.
+2. Instead of guessing weights or scores, make QUALITATIVE PAIRWISE COMPARISONS using Saaty's 1-9 scale:
+   - 1 = Equal importance/preference
+   - 2 = Weak
+   - 3 = Moderate
+   - 4 = Moderate plus
+   - 5 = Strong
+   - 6 = Strong plus
+   - 7 = Very strong
+   - 8 = Very, very strong
+   - 9 = Extreme
+3. Criteria comparisons (criteriaComparisons): compare how much more important each criterion is than another.
+   Format: [C1vsC2, C1vsC3, C2vsC3]
+   Example: [3, 2, 1] means C1 is 3x more important than C2, C1 is 2x more important than C3, C2 and C3 are equally important.
+4. Option comparisons (optionComparisons): for each criterion, compare how much better each option is than another.
+   Format: for each criterion: [O1vsO2, O1vsO3, O2vsO3]
+   So optionComparisons is an array of 3 arrays (one per criterion, in order c1, c2, c3).
+   Example: For c1: [3, 5, 2] means O1 is 3x better than O2, O1 is 5x better than O3, O2 is 2x better than O3.
+5. confidence must be 0-100 (your certainty in the recommendation based on data quality).
+6. CURRENCY: Always use ₹ (Indian Rupee) for any monetary amounts — never $ or USD. Use Indian notation (lakhs/crores) for large numbers.
+7. Return ONLY valid JSON — no markdown, no code fences, no explanations.
+8. Every string must be properly quoted and closed.
+9. The response must be a single, complete JSON object.
 
 Expected JSON structure:
 {
@@ -592,9 +608,15 @@ Expected JSON structure:
     { "id": "o3", "label": "string", "description": "string — specific to the data" }
   ],
   "criteria": [
-    { "id": "c1", "name": "string", "weight": 0.4 },
-    { "id": "c2", "name": "string", "weight": 0.3 },
-    { "id": "c3", "name": "string", "weight": 0.3 }
+    { "id": "c1", "name": "string" },
+    { "id": "c2", "name": "string" },
+    { "id": "c3", "name": "string" }
+  ],
+  "criteriaComparisons": [3, 2, 1],
+  "optionComparisons": [
+    [3, 5, 2],
+    [1, 3, 3],
+    [2, 1, 2]
   ],
   "recommendation": "string — which option is best and exactly why, with data-backed justification using ₹ amounts",
   "confidence": 82,
@@ -604,12 +626,7 @@ Expected JSON structure:
     "tradeoffs": ["string — specific tradeoff between options"],
     "risks": ["string — specific risk with data reference and ₹ amounts"],
     "sensitivity": "string — how sensitive the result is to weight changes"
-  },
-  "scores": [
-    { "optionId": "o1", "c1": 80, "c2": 90, "c3": 70, "total": 80 },
-    { "optionId": "o2", "c1": 70, "c2": 60, "c3": 80, "total": 70 },
-    { "optionId": "o3", "c1": 60, "c2": 70, "c3": 60, "total": 63 }
-  ]
+  }
 }`;
 
   try {
@@ -646,8 +663,43 @@ Expected JSON structure:
       throw new Error(`MCDA analysis returned invalid data structure: ${issues}`);
     }
 
+    const mcdaResult = result.data;
+
+    // AHP post-processing: if the LLM provided pairwise comparisons, run the math engine
+    if (mcdaResult.criteriaComparisons && mcdaResult.optionComparisons && mcdaResult.options && mcdaResult.criteria) {
+      const comparisons = mcdaResult.criteriaComparisons as [number, number, number];
+      const optionComps = mcdaResult.optionComparisons as [[number, number, number], [number, number, number], [number, number, number]];
+      if (comparisons.length === 3 && optionComps.length === 3 && optionComps.every(c => c.length === 3)) {
+        const synthesis = ahpSynthesis({ criteriaComparisons: comparisons, optionComparisons: optionComps });
+
+        // Attach computed weights to criteria
+        mcdaResult.criteria.forEach((c, i) => {
+          c.weight = Math.round(synthesis.weights[i] * 1000) / 1000;
+        });
+
+        // Build scores array matching the expected format
+        const scoreKeys = mcdaResult.criteria.map(c => c.id);
+        mcdaResult.scores = mcdaResult.options.map((opt, optIdx) => {
+          const score: Record<string, string | number> = {
+            optionId: opt.id,
+            total: Math.round(synthesis.totalScores[optIdx] * 100),
+          };
+          scoreKeys.forEach((key, critIdx) => {
+            score[key] = Math.round(synthesis.optionVectors[critIdx][optIdx] * 100);
+          });
+          return score;
+        });
+
+        if (!synthesis.consistency.isConsistent) {
+          console.warn(`[MCDA] AHP consistency warning: criteriaCR=${synthesis.consistency.criteriaCR.toFixed(3)}, optionCRs=[${synthesis.consistency.optionCRs.map(c => c.toFixed(3)).join(', ')}]`);
+        }
+
+        console.log('[MCDA] ✅ AHP synthesis applied successfully');
+      }
+    }
+
     console.log('[MCDA] ✅ Analysis complete and validated');
-    return result.data;
+    return mcdaResult;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[MCDA] Analysis failed:', message);
