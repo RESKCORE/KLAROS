@@ -51,10 +51,17 @@ CREATE INDEX IF NOT EXISTS idx_data_sources_user_id ON data_sources(user_id);
 ALTER TABLE data_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE decisions ENABLE ROW LEVEL SECURITY;
 
--- Public access policies (MVP mode — security enforced at app layer via user_id column)
--- This fixes the 42501 "permission denied" error by allowing anonymous key access.
+-- Strict RLS policies matching Clerk JWT user_id
 DROP POLICY IF EXISTS "Public access" ON data_sources;
-CREATE POLICY "Public access" ON data_sources FOR ALL USING (true);
+DROP POLICY IF EXISTS "Users manage own data_sources" ON data_sources;
+CREATE POLICY "Users manage own data_sources"
+ON data_sources FOR ALL
+USING  (auth.jwt() ->> 'sub' = user_id)
+WITH CHECK (auth.jwt() ->> 'sub' = user_id);
 
 DROP POLICY IF EXISTS "Public access" ON decisions;
-CREATE POLICY "Public access" ON decisions FOR ALL USING (true);
+DROP POLICY IF EXISTS "Users manage own decisions" ON decisions;
+CREATE POLICY "Users manage own decisions"
+ON decisions FOR ALL
+USING  (auth.jwt() ->> 'sub' = user_id)
+WITH CHECK (auth.jwt() ->> 'sub' = user_id);

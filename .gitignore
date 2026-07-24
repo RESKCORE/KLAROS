@@ -10,6 +10,9 @@
 # Keep .env.example for reference
 !.env.example
 
+# Vercel upload file — contains real secrets, never commit
+.env.vercel
+
 # ============================================
 # Dependencies
 # ============================================
