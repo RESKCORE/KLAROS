@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Routing smoke', () => {
   test('landing page renders primary content', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /why choose klaros/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /why teams choose klaros/i })).toBeVisible();
   });
 
   test('protected routes redirect unauthenticated users to login', async ({ page }) => {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inventory_dataset>
+  <record prod_id="SKU-2001" item_desc="Sparkling Water 500ml" dept_group="Beverages" selling_price_inr="40" cost_per_unit="22" available_stock_qty="150" txn_date="2024-05-14" />
+  <record prod_id="SKU-2002" item_desc="Greek Yogurt 200g" dept_group="Dairy" selling_price_inr="90" cost_per_unit="55" available_stock_qty="30" txn_date="2024-05-14" />
+  <record prod_id="SKU-2003" item_desc="Multigrain Cookies 250g" dept_group="Snacks" selling_price_inr="120" cost_per_unit="75" available_stock_qty="95" txn_date="2024-05-15" />
+  <record prod_id="SKU-2004" item_desc="Extra Virgin Olive Oil 1L" dept_group="Groceries" selling_price_inr="990" cost_per_unit="720" available_stock_qty="18" txn_date="2024-05-15" />
+  <record prod_id="SKU-2005" item_desc="Almond Butter 350g" dept_group="Groceries" selling_price_inr="450" cost_per_unit="310" available_stock_qty="12" txn_date="2024-05-16" />
+</inventory_dataset>

@@ -228,6 +228,70 @@ export async function uploadDataset(
   }
 }
 
+export async function uploadNormalizedDataset(
+  userId: string,
+  datasetName: string,
+  normalizedData: {
+    sales: Record<string, unknown>[];
+    products: Record<string, unknown>[];
+    stock: Record<string, unknown>[];
+    investments: Record<string, unknown>[];
+  },
+): Promise<{ ok: boolean; dataSourceId: string }> {
+  try {
+    console.log(`📤 Uploading normalized AI dataset to Supabase...`);
+    const client = await getSupabaseClient();
+
+    const counts = {
+      products: normalizedData.products.length,
+      salesHistory: normalizedData.sales.length,
+      stockMovements: normalizedData.stock.length,
+      investments: normalizedData.investments.length,
+      _data: normalizedData,
+    };
+
+    const { data, error } = await client
+      .from('data_sources')
+      .insert({
+        user_id: userId,
+        name: datasetName,
+        type: 'ai_parsed_upload',
+        status: 'connected',
+        last_synced_at: new Date().toISOString(),
+        counts,
+        csv_data: normalizedData,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      // Fallback if csv_data column is missing
+      const { data: data2, error: error2 } = await client
+        .from('data_sources')
+        .insert({
+          user_id: userId,
+          name: datasetName,
+          type: 'ai_parsed_upload',
+          status: 'connected',
+          last_synced_at: new Date().toISOString(),
+          counts,
+        })
+        .select('id')
+        .single();
+
+      if (error2) throw new Error(`Supabase error: ${JSON.stringify(error2)}`);
+      writeCache(DATA_SOURCES_CACHE_KEY, null);
+      return { ok: true, dataSourceId: data2.id };
+    }
+
+    writeCache(DATA_SOURCES_CACHE_KEY, null);
+    return { ok: true, dataSourceId: data.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to save normalized dataset: ${message}`);
+  }
+}
+
 export async function autoAnalyze(
   userId: string,
   dataSourceId?: string,

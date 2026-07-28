@@ -1,0 +1,47 @@
+[
+  {
+    "prod_id": "SKU-1001",
+    "item_desc": "Fresh Whole Milk 1L",
+    "dept_group": "Dairy",
+    "selling_price_inr": 65,
+    "cost_per_unit": 45,
+    "available_stock_qty": 120,
+    "txn_date": "2024-05-10"
+  },
+  {
+    "prod_id": "SKU-1002",
+    "item_desc": "Organic Brown Bread 400g",
+    "dept_group": "Bakery",
+    "selling_price_inr": 50,
+    "cost_per_unit": 30,
+    "available_stock_qty": 85,
+    "txn_date": "2024-05-11"
+  },
+  {
+    "prod_id": "SKU-1003",
+    "item_desc": "Premium Assam Tea 500g",
+    "dept_group": "Beverages",
+    "selling_price_inr": 280,
+    "cost_per_unit": 180,
+    "available_stock_qty": 40,
+    "txn_date": "2024-05-12"
+  },
+  {
+    "prod_id": "SKU-1004",
+    "item_desc": "Basmati Rice 5kg",
+    "dept_group": "Groceries",
+    "selling_price_inr": 650,
+    "cost_per_unit": 480,
+    "available_stock_qty": 25,
+    "txn_date": "2024-05-12"
+  },
+  {
+    "prod_id": "SKU-1005",
+    "item_desc": "Dark Chocolate 100g",
+    "dept_group": "Snacks",
+    "selling_price_inr": 150,
+    "cost_per_unit": 90,
+    "available_stock_qty": 200,
+    "txn_date": "2024-05-13"
+  }
+]

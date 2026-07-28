@@ -149,3 +149,33 @@ export async function deleteDecision(id: string): Promise<void> {
     throw error;
   }
 }
+
+export async function duplicateDecision(id: string): Promise<Decision> {
+  const original = await getDecision(id);
+  const client = await getSupabaseClient();
+
+  const newRow = {
+    user_id: original.user_id,
+    title: `${original.title} (Copy)`,
+    context: original.context || null,
+    status: original.status,
+    data_source_id: original.data_source_id || null,
+    decision_type: original.decision_type || null,
+    options: original.options,
+    criteria: original.criteria,
+    constraints: original.constraints,
+    result_json: original.result_json || null,
+  };
+
+  const { data, error } = await client
+    .from('decisions')
+    .insert(newRow)
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to duplicate decision');
+  }
+
+  return mapRowToDecision(data as DecisionRow);
+}

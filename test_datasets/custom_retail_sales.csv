@@ -1,0 +1,6 @@
+Prod_ID,Item Desc,Dept_Group,Selling_Price_INR,Cost_Per_Unit,Available_Stock_Qty,Txn_Date
+SKU-4001,Fresh Orange Juice 1L,Beverages,110,65,90,2024-05-18
+SKU-4002,Butter Croissant,Bakery,70,35,45,2024-05-18
+SKU-4003,Mozzarella Cheese 200g,Dairy,210,140,35,2024-05-19
+SKU-4004,Pistachio Nuts 150g,Snacks,390,270,50,2024-05-19
+SKU-4005,Maple Syrup 250ml,Groceries,520,360,15,2024-05-20

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import type { Decision } from "@/features/decisions/types/decision";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { deleteDecision, archiveDecision } from "@/features/decisions/store/decision-store";
+import { deleteDecision, archiveDecision, duplicateDecision } from "@/features/decisions/store/decision-store";
 import { isV2Decision } from "@/features/decisions/core/decision-workflow";
 
 interface DecisionCardProps {
@@ -101,12 +101,28 @@ export function DecisionCard({ decision, viewMode = "grid", className, style, on
     }
   };
 
-  const handleDuplicate = () => {
-    toast({
-      title: "Duplicating decision",
-      description: "Creating a copy of this decision...",
-    });
-    // TODO: Implement duplicate functionality
+  const handleDuplicate = async () => {
+    try {
+      toast({
+        title: "Duplicating decision",
+        description: "Creating a copy of this decision...",
+      });
+      await duplicateDecision(decision.id);
+      toast({
+        title: "Decision duplicated",
+        description: `Created copy of "${decision.title}".`,
+      });
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error("Duplicate error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate decision. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleArchive = async () => {

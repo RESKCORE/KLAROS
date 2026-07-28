@@ -32,6 +32,22 @@ export function isProxyConfigured(): boolean {
   return import.meta.env.PROD === true || import.meta.env.VITE_USE_LLM_PROXY === 'true';
 }
 
+/**
+ * Returns true if an AI API key is available either via the /api/llm proxy
+ * or via direct client environment variables (VITE_GROQ_API_KEY, VITE_OPENROUTER_API_KEY, VITE_GEMINI_API_KEY).
+ */
+export function hasApiKey(): boolean {
+  if (isProxyConfigured()) return true;
+  const groq = import.meta.env.VITE_GROQ_API_KEY;
+  const openrouter = import.meta.env.VITE_OPENROUTER_API_KEY;
+  const gemini = import.meta.env.VITE_GEMINI_API_KEY;
+  return Boolean(
+    (groq && groq.length > 5) ||
+    (openrouter && openrouter.length > 5) ||
+    (gemini && gemini.length > 5)
+  );
+}
+
 // ─── Clerk Token Helper ───────────────────────────────────────────────────────
 
 interface ClerkWindow extends Window {

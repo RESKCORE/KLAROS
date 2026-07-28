@@ -1,0 +1,6 @@
+Prod_ID	Item Desc	Dept_Group	Selling_Price_INR	Cost_Per_Unit	Available_Stock_Qty	Txn_Date
+SKU-3001	Cold Brew Coffee 250ml	Beverages	120	70	60	2024-05-16
+SKU-3002	Almond Croissant	Bakery	85	45	25	2024-05-16
+SKU-3003	Cheddar Cheese 200g	Dairy	240	160	40	2024-05-17
+SKU-3004	Roasted Cashews 150g	Snacks	320	210	75	2024-05-17
+SKU-3005	Organic Honey 500g	Groceries	380	250	30	2024-05-18

@@ -59,5 +59,5 @@ export {
 // should migrate to isProxyConfigured(), but we keep the old name pointing at
 // the new implementation so nothing breaks during the transition.
 
-export { isProxyConfigured as hasApiKey } from '@/services/llm/core/llm-proxy-client';
+export { hasApiKey } from '@/services/llm/core/llm-proxy-client';
 export { isProxyConfigured as getAvailableProviders } from '@/services/llm/core/llm-proxy-client';
