@@ -25,6 +25,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Redis } from '@upstash/redis';
 
 // ─── Environment ──────────────────────────────────────────────────────────────
 
@@ -33,6 +34,50 @@ const OR_KEY         = process.env.OPENROUTER_API_KEY;
 const GEM_KEY        = process.env.GEMINI_API_KEY;
 const CLERK_JWT_KEY  = process.env.CLERK_JWT_KEY; // RSA public key (PEM)
 const APP_URL        = process.env.VITE_APP_URL ?? 'https://klaros.vercel.app';
+const UPSTASH_URL =
+  process.env.UPSTASH_REDIS_REST_URL ??
+  process.env.KV_REST_API_URL ??
+  process.env.STORAGE_REST_API_URL ??
+  process.env.STORAGE_URL;
+
+const UPSTASH_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN ??
+  process.env.KV_REST_API_TOKEN ??
+  process.env.STORAGE_REST_API_TOKEN ??
+  process.env.STORAGE_TOKEN;
+
+
+// ─── Redis Client Initialization ──────────────────────────────────────────────
+
+let redisClient: Redis | null = null;
+if (UPSTASH_URL && UPSTASH_TOKEN) {
+  try {
+    redisClient = new Redis({
+      url: UPSTASH_URL,
+      token: UPSTASH_TOKEN,
+    });
+  } catch (err) {
+    console.warn('[llm proxy] Upstash Redis initialization failed:', err);
+  }
+}
+
+/**
+ * Computes a deterministic SHA-256 cache key from request parameters.
+ */
+async function computeCacheKey(
+  prompt: string,
+  maxTokens: number,
+  temperature: number,
+  requireJson: boolean,
+): Promise<string> {
+  const payload = `${prompt}:${maxTokens}:${temperature}:${requireJson}`;
+  const msgUint8 = new TextEncoder().encode(payload);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `klaros:llm:${hashHex}`;
+}
+
 
 // ─── JWT Verification ─────────────────────────────────────────────────────────
 
@@ -250,13 +295,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Hard ceiling to prevent prompt injection from requesting enormous outputs
   const safeMaxTokens = Math.min(maxTokens, 4_000);
 
+  // ── Redis Cache Lookup ──────────────────────────────────────────────────────
+  let cacheKey = '';
+  if (redisClient) {
+    try {
+      cacheKey = await computeCacheKey(prompt, safeMaxTokens, temperature, requireJson);
+      const cachedResponse = await redisClient.get<string>(cacheKey);
+      if (cachedResponse) {
+        return res.status(200).json({ text: cachedResponse, cached: true });
+      }
+    } catch (cacheErr) {
+      console.warn('[llm proxy] Redis cache read failed:', cacheErr);
+    }
+  }
+
+  // Helper to store response in Redis (24 hr TTL) and return HTTP 200
+  const sendAndCacheResponse = async (text: string) => {
+    if (redisClient && cacheKey) {
+      try {
+        await redisClient.set(cacheKey, text, { ex: 86400 });
+      } catch (cacheErr) {
+        console.warn('[llm proxy] Redis cache write failed:', cacheErr);
+      }
+    }
+    return res.status(200).json({ text, cached: false });
+  };
+
   // ── Dispatch with server-side keys ──────────────────────────────────────────
   const providerAttempts: string[] = [];
 
   if (GROQ_KEY) {
     try {
       const text = await callGroqServer(prompt, safeMaxTokens, temperature);
-      return res.status(200).json({ text });
+      return await sendAndCacheResponse(text);
     } catch (err) {
       providerAttempts.push(`Groq: ${String(err).slice(0, 80)}`);
     }
@@ -265,7 +336,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (OR_KEY) {
     try {
       const text = await callOpenRouterServer(prompt, safeMaxTokens, temperature);
-      return res.status(200).json({ text });
+      return await sendAndCacheResponse(text);
     } catch (err) {
       providerAttempts.push(`OpenRouter: ${String(err).slice(0, 80)}`);
     }
@@ -274,7 +345,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (GEM_KEY) {
     try {
       const text = await callGeminiServer(prompt, safeMaxTokens, temperature, requireJson);
-      return res.status(200).json({ text });
+      return await sendAndCacheResponse(text);
     } catch (err) {
       providerAttempts.push(`Gemini: ${String(err).slice(0, 80)}`);
     }
