@@ -3,8 +3,17 @@
 // Run Supabase migration to add csv_data column
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://hkfqnhulnwnqvovleyua.supabase.co';
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrZnFuaHVsbm13bnF2b3ZsZXl1YSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTg0Njg1NTU5OX0.PLACEHOLDER';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://hkfqnhulnwnqvovleyua.supabase.co';
+const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER_SERVICE_ROLE_KEY';
+
+if (!supabaseUrl || supabaseUrl.includes('your-project')) {
+  console.error('❌ Error: VITE_SUPABASE_URL is not configured correctly.');
+  process.exit(1);
+}
+
+if (supabaseServiceRole === 'PLACEHOLDER_SERVICE_ROLE_KEY') {
+  console.warn('⚠️  Warning: SUPABASE_SERVICE_ROLE_KEY is using a placeholder. Migration might fail.');
+}
 
 const client = createClient(supabaseUrl, supabaseServiceRole);
 
