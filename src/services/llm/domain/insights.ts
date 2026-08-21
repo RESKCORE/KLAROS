@@ -122,6 +122,22 @@ Rules:
   };
 }
 
+function cleanTextResponse(text: string): string {
+  let cleaned = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .trim();
+
+  // If the model starts with conversational self-talk like "We need to write..." or "Here is the summary:"
+  const metaPreambleMatch = cleaned.match(/^(?:(?:Here is|Below is|This is|We need to|As an AI|In summary|Summary:)[\s\S]*?\n\n+)([\s\S]+)$/i);
+  if (metaPreambleMatch && metaPreambleMatch[1]) {
+    cleaned = metaPreambleMatch[1].trim();
+  }
+
+  return cleaned;
+}
+
 /**
  * Generates a single executive-prose paragraph (3-5 sentences) suitable
  * for display at the top of the dashboard without bullet points.
@@ -142,15 +158,31 @@ export async function generateAiNarrative(metrics: MarketMetrics): Promise<strin
       : null,
   };
 
-  const prompt = `You are a BI report writer for an Indian retail business. Write a single concise paragraph (3-5 sentences) that narrates the key business story from this retail metrics data. Write it as if presenting to an executive — specific, data-driven, highlighting the single most important finding and one risk. Do not use bullet points. Use the actual numbers.
-
-IMPORTANT: Always use Indian Rupee format: ₹ symbol with Indian number notation (lakhs/crores). Never use $ or USD. Example: "₹1.96 lakhs" not "$196,687".
+  const prompt = `You are a senior BI executive report writer for an Indian retail business. Analyze this retail data and return ONLY a JSON object with a polished, high-impact executive narrative paragraph.
 
 DATA: ${JSON.stringify(payload)}
 
-Return ONLY the paragraph text, no other content.`;
+Return strictly this JSON format:
+{
+  "narrative": "A concise, professional 3-4 sentence paragraph highlighting the revenue performance, top growth drivers, and stock/cost risk. Use Indian currency format (₹). Do not include internal thinking, self-talk, or prompt echoes."
+}`;
 
-  return callLLMProxy(prompt, { maxTokens: 400, temperature: 0.4 });
+  try {
+    const raw = await callLLMProxy(prompt, { maxTokens: 400, temperature: 0.2, requireJson: true });
+    const json = extractJSON(raw);
+    const parsed = JSON.parse(json) as { narrative?: string };
+    if (parsed.narrative && parsed.narrative.length > 20) {
+      return cleanTextResponse(parsed.narrative);
+    }
+  } catch (err) {
+    console.warn('[insights] Narrative JSON extraction failed, using deterministic summary', err);
+  }
+
+  // High-quality deterministic summary fallback
+  const rev = metrics.kpis.totalRevenue.toLocaleString('en-IN');
+  const units = metrics.kpis.totalUnits.toLocaleString('en-IN');
+  const topProd = metrics.topProducts[0]?.name || 'Top Product';
+  return `The business generated ₹${rev} across ${units} units sold, led primarily by ${topProd}. Profit margin is recorded at ${metrics.kpis.profitMarginPct.toFixed(1)}% with ${metrics.kpis.lowStockCount} low-stock SKUs currently requiring inventory attention.`;
 }
 
 /**

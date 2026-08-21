@@ -126,7 +126,7 @@ async function getJwkPublicKey(iss: string, kid?: string): Promise<CryptoKey | n
  *
  * @throws when the token is missing, malformed, expired, or has an invalid signature.
  */
-async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
+async function verifyClerkJwt(authHeader: string | undefined): Promise<{ userId: string }> {
   if (!authHeader?.startsWith('Bearer ')) {
     throw new Error('Missing or malformed Authorization header');
   }
@@ -156,6 +156,7 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
     throw new Error('JWT has expired');
   }
 
+  const userId = payload.sub || 'authenticated_user';
   const signingInput = `${headerB64}.${payloadB64}`;
   const signatureBuffer = Buffer.from(sigB64, 'base64url');
 
@@ -183,7 +184,7 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
         Buffer.from(signingInput),
       );
 
-      if (isValid) return; // Verified successfully!
+      if (isValid) return { userId };
     } catch (pemErr) {
       console.warn('[llm proxy] PEM verification attempt failed, attempting JWKS fallback:', pemErr);
     }
@@ -199,7 +200,7 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
         signatureBuffer,
         Buffer.from(signingInput),
       );
-      if (isValid) return; // Verified successfully!
+      if (isValid) return { userId };
       throw new Error('JWT signature verification failed against Clerk JWKS');
     }
   }
@@ -207,7 +208,7 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
   // Option C: Local dev fallback when no public key could be found
   if (process.env.NODE_ENV !== 'production') {
     console.warn('[llm proxy] Could not verify Clerk JWT signature in dev mode — allowing request');
-    return;
+    return { userId };
   }
 
   throw new Error('CLERK_JWT_KEY is not configured and JWKS could not be fetched');
@@ -232,8 +233,12 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'mixtral-8x7b-32768',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.6-27b',
   'gemma2-9b-it',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
 ];
 
 async function callGroqServer(
@@ -263,11 +268,21 @@ async function callGroqServer(
       body.response_format = { type: 'json_object' };
     }
 
-    const response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+    let response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
       body: JSON.stringify(body),
     });
+
+    // If 400 Bad Request (e.g. model does not support response_format), retry without response_format
+    if (response.status === 400 && body.response_format) {
+      delete body.response_format;
+      response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify(body),
+      });
+    }
 
     if (response.status === 429) continue;       // rate-limited — try next model
     if (!response.ok) continue;                  // server error — try next model
@@ -280,9 +295,12 @@ async function callGroqServer(
 }
 
 const OPENROUTER_MODELS = [
+  'openrouter/free',
+  'openrouter/auto',
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemini-2.0-flash-exp:free',
   'qwen/qwen-2.5-72b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
 ];
 
@@ -313,7 +331,7 @@ async function callOpenRouterServer(
       body.response_format = { type: 'json_object' };
     }
 
-    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    let response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -323,6 +341,21 @@ async function callOpenRouterServer(
       },
       body: JSON.stringify(body),
     });
+
+    // If 400 Bad Request, retry without response_format
+    if (response.status === 400 && body.response_format) {
+      delete body.response_format;
+      response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OR_KEY}`,
+          'HTTP-Referer': APP_URL,
+          'X-Title': 'KLAROS Analytics',
+        },
+        body: JSON.stringify(body),
+      });
+    }
 
     if (response.status === 429) continue;
     if (!response.ok) continue;
@@ -335,10 +368,11 @@ async function callOpenRouterServer(
 }
 
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+  'gemini-pro',
 ];
 
 async function callGeminiServer(
@@ -352,12 +386,22 @@ async function callGeminiServer(
   const generationConfig: Record<string, unknown> = { maxOutputTokens: maxTokens, temperature };
   if (requireJson) generationConfig.responseMimeType = 'application/json';
 
+  const systemMessage = requireJson
+    ? 'You are a multi-criteria decision intelligence API. You MUST output ONLY a valid RFC 8259 JSON object. Do not include markdown codeblocks (```), no thinking tags, no prose, and no commentary. Start directly with { and end with }.'
+    : undefined;
+
   for (const model of GEMINI_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEM_KEY}`;
     const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig }),
+      body: JSON.stringify({
+        contents: [
+          ...(systemMessage ? [{ role: 'user', parts: [{ text: `System instruction: ${systemMessage}` }] }] : []),
+          { role: 'user', parts: [{ text: prompt }] },
+        ],
+        generationConfig,
+      }),
     });
 
     if (response.status === 429) continue;
@@ -388,12 +432,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
+  let verifiedUserId = 'anonymous';
   try {
-    await verifyClerkJwt(req.headers.authorization);
+    const authResult = await verifyClerkJwt(req.headers.authorization);
+    verifiedUserId = authResult.userId;
   } catch (authErr) {
     const errorMsg = authErr instanceof Error ? authErr.message : 'Unauthorized';
     console.error('[llm proxy] Auth failed:', errorMsg);
     return res.status(401).json({ error: errorMsg });
+  }
+
+  // ── Rate Limiting (30 requests / 60 seconds per user) ──────────────────────
+  const RATE_LIMIT_MAX = 30;
+  const RATE_LIMIT_WINDOW = 60; // seconds
+
+  if (redisClient && verifiedUserId !== 'anonymous') {
+    try {
+      const rateLimitKey = `klaros:ratelimit:${verifiedUserId}`;
+      const currentCount = await redisClient.incr(rateLimitKey);
+      if (currentCount === 1) {
+        await redisClient.expire(rateLimitKey, RATE_LIMIT_WINDOW);
+      }
+      if (currentCount > RATE_LIMIT_MAX) {
+        res.setHeader('Retry-After', '60');
+        return res.status(429).json({
+          error: 'Rate limit exceeded. Maximum 30 AI requests per minute allowed.',
+        });
+      }
+    } catch (rlErr) {
+      console.warn('[llm proxy] Redis rate limit check failed:', rlErr);
+    }
   }
 
   // ── Parse body ──────────────────────────────────────────────────────────────

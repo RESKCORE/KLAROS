@@ -290,6 +290,10 @@ export default function Dashboard() {
     return { total, completed, running, biLinked };
   }, [decisions]);
 
+  const latestCompletedDecision = useMemo(() => {
+    return decisions.find((d) => d.status === 'done' && d.result_json);
+  }, [decisions]);
+
   return (
     <div className="min-h-screen flex bg-background">
       <DashboardSidebar />
@@ -375,19 +379,59 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card className="p-5 card-elevated">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Activity className="h-5 w-5" />
+            <Card className="p-5 card-elevated flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">Insights Snapshot</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {latestCompletedDecision ? 'Latest Strategic Analysis' : 'Quick overview of recent decision'}
+                      </p>
+                    </div>
+                  </div>
+                  {latestCompletedDecision?.result_json?.recommendation?.confidence && (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold">
+                      {latestCompletedDecision.result_json.recommendation.confidence}% Confidence
+                    </Badge>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-semibold">Insights Snapshot</h3>
-                  <p className="text-xs text-muted-foreground">Prototype visualization placeholder</p>
+
+                {latestCompletedDecision && latestCompletedDecision.result_json ? (
+                  <div className="space-y-3">
+                    <div className="rounded-xl bg-slate-50/80 border p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        {getDecisionLabel(latestCompletedDecision)}
+                      </p>
+                      <p className="font-semibold text-sm text-slate-850 mt-0.5">
+                        {latestCompletedDecision.result_json.recommendation.optionLabel}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                        {latestCompletedDecision.result_json.recommendation.summary}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">
+                    Select a connected dataset and click <strong>Auto-Analyze Now</strong> to view live strategic recommendations and MCDA snapshots here.
+                  </div>
+                )}
+              </div>
+
+              {latestCompletedDecision && (
+                <div className="pt-3 mt-3 border-t">
+                  <Link
+                    to={`/decisions/${latestCompletedDecision.id}/result`}
+                    className="flex items-center justify-between text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors group py-1"
+                  >
+                    <span className="group-hover:underline">View Full Decision & Radar Analysis</span>
+                    <ArrowRight className="h-3.5 w-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
                 </div>
-              </div>
-              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                Radar chart and key insight callouts will appear here after auto-analysis.
-              </div>
+              )}
             </Card>
           </section>
 

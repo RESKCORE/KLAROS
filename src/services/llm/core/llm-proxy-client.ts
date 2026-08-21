@@ -130,23 +130,30 @@ const GEM_KEY        = import.meta.env.VITE_GEMINI_API_KEY as string | undefined
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'qwen-3-32b',
-  'mixtral-8x7b-32768',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.6-27b',
+  'gemma2-9b-it',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
 ];
 
 const OPENROUTER_MODELS = [
-  'deepseek/deepseek-v4-flash:free',
-  'qwen/qwen3-32b:free',
-  'meta-llama/llama-4-scout:free',
+  'openrouter/free',
+  'openrouter/auto',
   'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemini-2.0-flash-exp:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
 ];
 
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+  'gemini-pro',
 ];
 
 async function callDirect(prompt: string, options: LLMCallOptions): Promise<string> {
@@ -157,15 +164,44 @@ async function callDirect(prompt: string, options: LLMCallOptions): Promise<stri
   const { maxTokens = 800, temperature = 0.2, requireJson = false } = options;
   const errors: string[] = [];
 
+  const systemMessage = requireJson
+    ? 'You are a multi-criteria decision intelligence API. You MUST output ONLY a valid RFC 8259 JSON object. Do not include markdown codeblocks (```), no thinking tags, no prose, and no commentary. Start directly with { and end with }.'
+    : undefined;
+
   // ── Groq ────────────────────────────────────────────────────────────────────
   if (GROQ_KEY) {
     for (const model of GROQ_MODELS) {
       try {
-        const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+        const messages = [
+          ...(systemMessage ? [{ role: 'system', content: systemMessage }] : []),
+          { role: 'user', content: prompt },
+        ];
+        const body: Record<string, unknown> = {
+          model,
+          messages,
+          max_tokens: maxTokens,
+          temperature,
+        };
+        if (requireJson) {
+          body.response_format = { type: 'json_object' };
+        }
+
+        let res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature }),
+          body: JSON.stringify(body),
         });
+
+        // If 400 Bad Request (e.g. model does not support response_format), retry without response_format
+        if (res.status === 400 && body.response_format) {
+          delete body.response_format;
+          res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+            body: JSON.stringify(body),
+          });
+        }
+
         if (res.status === 429 || !res.ok) { errors.push(`groq/${model}: ${res.status}`); continue; }
         const data = await res.json() as { choices?: { message?: { content?: string } }[] };
         const text = data.choices?.[0]?.message?.content;
@@ -178,7 +214,21 @@ async function callDirect(prompt: string, options: LLMCallOptions): Promise<stri
   if (OR_KEY) {
     for (const model of OPENROUTER_MODELS) {
       try {
-        const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+        const messages = [
+          ...(systemMessage ? [{ role: 'system', content: systemMessage }] : []),
+          { role: 'user', content: prompt },
+        ];
+        const body: Record<string, unknown> = {
+          model,
+          messages,
+          max_tokens: maxTokens,
+          temperature,
+        };
+        if (requireJson) {
+          body.response_format = { type: 'json_object' };
+        }
+
+        let res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -186,8 +236,24 @@ async function callDirect(prompt: string, options: LLMCallOptions): Promise<stri
             'HTTP-Referer': import.meta.env.VITE_APP_URL || 'http://localhost:8080',
             'X-Title': 'KLAROS Analytics',
           },
-          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature }),
+          body: JSON.stringify(body),
         });
+
+        // If 400 Bad Request, retry without response_format
+        if (res.status === 400 && body.response_format) {
+          delete body.response_format;
+          res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${OR_KEY}`,
+              'HTTP-Referer': import.meta.env.VITE_APP_URL || 'http://localhost:8080',
+              'X-Title': 'KLAROS Analytics',
+            },
+            body: JSON.stringify(body),
+          });
+        }
+
         if (res.status === 429 || !res.ok) { errors.push(`openrouter/${model}: ${res.status}`); continue; }
         const data = await res.json() as { choices?: { message?: { content?: string } }[] };
         const text = data.choices?.[0]?.message?.content;
@@ -206,7 +272,13 @@ async function callDirect(prompt: string, options: LLMCallOptions): Promise<stri
         const res = await fetchWithTimeout(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: genConfig }),
+          body: JSON.stringify({
+            contents: [
+              ...(systemMessage ? [{ role: 'user', parts: [{ text: `System instruction: ${systemMessage}` }] }] : []),
+              { role: 'user', parts: [{ text: prompt }] },
+            ],
+            generationConfig: genConfig,
+          }),
         });
         if (res.status === 429 || !res.ok) { errors.push(`gemini/${model}: ${res.status}`); continue; }
         const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };

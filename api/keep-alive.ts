@@ -8,12 +8,17 @@ export default async function handler(
     end: (data?: string) => void;
   },
 ) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') {
     res.status(200).end();
+    return;
+  }
+
+  // ── Verify Vercel Cron Authentication ──────────────────────────────────────
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    res.status(401).json({ message: 'Unauthorized' });
     return;
   }
 
@@ -21,34 +26,27 @@ export default async function handler(
   const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error('[Keep-Alive] Missing Supabase environment variables');
-    res.status(500).json({
-      message: 'Supabase environment variables not configured',
-    });
+    console.error('[Keep-Alive] Supabase credentials not configured');
+    res.status(500).json({ message: 'Service unavailable' });
     return;
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
     const { error } = await supabase.from('data_sources').select('id').limit(1);
 
     if (error) {
-      console.error('[Keep-Alive] Supabase query failed:', error.message);
-      res.status(500).json({
-        message: 'Supabase ping failed',
-        error: error.message,
-      });
+      console.error('[Keep-Alive] Supabase ping failed:', error.message);
+      res.status(500).json({ message: 'Health check failed' });
       return;
     }
 
     console.log('[Keep-Alive] Supabase ping successful');
-    res.status(200).json({ message: 'Supabase is alive!' });
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[Keep-Alive] Unexpected error:', message);
-    res.status(500).json({
-      message: 'Keep-alive check failed',
-      error: message,
-    });
+    console.error('[Keep-Alive] Unexpected error:', err);
+    res.status(500).json({ message: 'Health check failed' });
   }
 }

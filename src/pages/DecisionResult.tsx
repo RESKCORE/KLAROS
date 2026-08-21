@@ -790,21 +790,63 @@ export default function DecisionResult() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Executive Summary Narrative */}
-              <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] h-full">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="h-5 w-5 text-blue-600" />
-                  <CardTitle className="text-base font-semibold text-slate-850">AI Executive Summary</CardTitle>
-                </div>
-                {aiAnalyticsLoading && !aiAnalytics ? (
-                  <div className="space-y-2">
-                    <div className="h-4 bg-slate-100 rounded animate-pulse w-full" />
-                    <div className="h-4 bg-slate-100 rounded animate-pulse w-5/6" />
-                    <div className="h-4 bg-slate-100 rounded animate-pulse w-4/6" />
+              <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <CardTitle className="text-base font-semibold text-slate-850">AI Executive Summary</CardTitle>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wider bg-blue-50/50 text-blue-700 border-blue-100">
+                      Automated Synthesis
+                    </Badge>
                   </div>
-                ) : (
-                  <p className="text-sm text-slate-650 leading-relaxed font-medium">
-                    {aiAnalytics?.narrative || 'AI Executive narrative is unavailable. Verify API key credentials.'}
-                  </p>
+
+                  {aiAnalyticsLoading && !aiAnalytics ? (
+                    <div className="space-y-2.5">
+                      <div className="h-4 bg-slate-100 rounded animate-pulse w-full" />
+                      <div className="h-4 bg-slate-100 rounded animate-pulse w-5/6" />
+                      <div className="h-4 bg-slate-100 rounded animate-pulse w-4/6" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-sm text-slate-650 leading-relaxed font-normal">
+                        {aiAnalytics?.narrative || 'Executive overview generated from recent transactions.'}
+                      </p>
+
+                      {/* Structured Quick Facts Pill Badges */}
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200/60">
+                          <Activity className="h-3.5 w-3.5 text-blue-500" />
+                          <span>Revenue: <strong>{currencyFormatter.format(metrics.kpis.totalRevenue)}</strong></span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200/60">
+                          <Package className="h-3.5 w-3.5 text-emerald-500" />
+                          <span>{metrics.kpis.totalUnits.toLocaleString('en-IN')} units sold</span>
+                        </span>
+                        {metrics.kpis.lowStockCount > 0 ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/60">
+                            <Tag className="h-3.5 w-3.5 text-rose-500" />
+                            <span>{metrics.kpis.lowStockCount} low stock alerts</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <Tag className="h-3.5 w-3.5 text-emerald-500" />
+                            <span>Inventory stable</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {aiAnalytics?.dataQualityNote && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <span className="font-medium text-slate-500">Data Note:</span>
+                    <span>{aiAnalytics.dataQualityNote}</span>
+                  </div>
                 )}
               </Card>
 
