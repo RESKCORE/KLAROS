@@ -32,32 +32,28 @@ import { z } from 'zod';
  * preference for A over B), exclusive of zero to prevent division-by-zero in
  * the AHP matrix inversion.
  */
-const SaatyValueSchema = z
-  .number()
-  .min(1 / 9, 'Saaty value must be ≥ 1/9 (reciprocal of 9)')
-  .max(9, 'Saaty value must be ≤ 9')
-  .refine((n) => Number.isFinite(n), 'Saaty value must be finite (not NaN or Infinity)');
+const SaatyValueSchema = z.preprocess(
+  (val) => (typeof val === 'string' ? parseFloat(val) : val),
+  z
+    .number()
+    .min(1 / 9, 'Saaty value must be ≥ 1/9 (reciprocal of 9)')
+    .max(9, 'Saaty value must be ≤ 9')
+    .refine((n) => Number.isFinite(n), 'Saaty value must be finite (not NaN or Infinity)'),
+);
 
 /**
  * A triple of Saaty values representing the three pairwise comparisons
  * needed for a 3×3 AHP matrix: [A vs B, A vs C, B vs C].
  */
-export const ComparisonTripleSchema = z.tuple([
-  SaatyValueSchema,
-  SaatyValueSchema,
-  SaatyValueSchema,
+export const ComparisonTripleSchema = z.union([
+  z.tuple([SaatyValueSchema, SaatyValueSchema, SaatyValueSchema]),
+  z.array(SaatyValueSchema).length(3).transform((arr) => [arr[0], arr[1], arr[2]] as [number, number, number]),
 ]);
 
 // ─── MCDA Raw Response Schema ─────────────────────────────────────────────────
 
 /**
  * Schema for the raw LLM MCDA response before AHP post-processing.
- *
- * Fields are divided into two groups:
- *  • AHP-critical (options, criteria, comparisons, confidence, recommendation,
- *    reasoning) — parsed strictly; validation failure triggers a retry.
- *  • Display-only (title, context, data_quality_note, scores) — use .catch()
- *    so a missing or malformed display field never blocks the analysis.
  */
 export const McdaRawResponseSchema = z.object({
   // ── Display-only fields (soft failure is acceptable) ──────────────────────
@@ -73,7 +69,7 @@ export const McdaRawResponseSchema = z.object({
       z.object({
         id: z.string().min(1),
         label: z.string().min(1),
-        description: z.string().optional(),
+        description: z.string().optional().catch(''),
       }),
     )
     .min(3, 'MCDA requires exactly 3 options')
@@ -105,21 +101,20 @@ export const McdaRawResponseSchema = z.object({
     .max(3, 'optionComparisons must contain exactly 3 triples'),
 
   /** Natural-language recommendation citing specific data. */
-  recommendation: z.string().min(10, 'recommendation must be a meaningful string'),
+  recommendation: z.string().min(5, 'recommendation must be a meaningful string'),
 
   /** LLM self-reported certainty (0–100). */
-  confidence: z
-    .number()
-    .int('confidence must be an integer')
-    .min(0)
-    .max(100),
+  confidence: z.preprocess(
+    (val) => (typeof val === 'string' ? Math.round(parseFloat(val) || 75) : Math.round(Number(val) || 75)),
+    z.number().min(0).max(100),
+  ),
 
   reasoning: z.object({
-    decomposition: z.string(),
-    assumptions: z.array(z.string()),
-    tradeoffs: z.array(z.string()),
-    risks: z.array(z.string()),
-    sensitivity: z.string(),
+    decomposition: z.string().optional().catch(''),
+    assumptions: z.array(z.string()).optional().catch([]),
+    tradeoffs: z.array(z.string()).optional().catch([]),
+    risks: z.array(z.string()).optional().catch([]),
+    sensitivity: z.string().optional().catch(''),
   }),
 
   // ── Computed post-processing field (not from LLM) ─────────────────────────

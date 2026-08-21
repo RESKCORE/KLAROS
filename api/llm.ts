@@ -232,18 +232,41 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'qwen-3-32b',
   'mixtral-8x7b-32768',
+  'gemma2-9b-it',
 ];
 
-async function callGroqServer(prompt: string, maxTokens: number, temperature: number): Promise<string> {
+async function callGroqServer(
+  prompt: string,
+  maxTokens: number,
+  temperature: number,
+  requireJson = false,
+): Promise<string> {
   if (!GROQ_KEY) throw new Error('Groq key not configured on server');
 
   for (const model of GROQ_MODELS) {
+    const messages = [
+      ...(requireJson
+        ? [{ role: 'system', content: 'You are a multi-criteria decision intelligence API. You MUST output ONLY a valid RFC 8259 JSON object. Do not include markdown codeblocks (```), no thinking tags, no prose, and no commentary. Start directly with { and end with }.' }]
+        : []),
+      { role: 'user', content: prompt },
+    ];
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    };
+
+    if (requireJson) {
+      body.response_format = { type: 'json_object' };
+    }
+
     const response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature }),
+      body: JSON.stringify(body),
     });
 
     if (response.status === 429) continue;       // rate-limited — try next model
@@ -257,17 +280,39 @@ async function callGroqServer(prompt: string, maxTokens: number, temperature: nu
 }
 
 const OPENROUTER_MODELS = [
-  'deepseek/deepseek-v4-flash:free',
-  'qwen/qwen3-32b:free',
-  'meta-llama/llama-4-scout:free',
   'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemini-2.0-flash-exp:free',
+  'qwen/qwen-2.5-72b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
 ];
 
-async function callOpenRouterServer(prompt: string, maxTokens: number, temperature: number): Promise<string> {
+async function callOpenRouterServer(
+  prompt: string,
+  maxTokens: number,
+  temperature: number,
+  requireJson = false,
+): Promise<string> {
   if (!OR_KEY) throw new Error('OpenRouter key not configured on server');
 
+  const messages = [
+    ...(requireJson
+      ? [{ role: 'system', content: 'You are a multi-criteria decision intelligence API. You MUST output ONLY a valid RFC 8259 JSON object. Do not include markdown codeblocks (```), no thinking tags, no prose, and no commentary. Start directly with { and end with }.' }]
+      : []),
+    { role: 'user', content: prompt },
+  ];
+
   for (const model of OPENROUTER_MODELS) {
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    };
+
+    if (requireJson) {
+      body.response_format = { type: 'json_object' };
+    }
+
     const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -276,7 +321,7 @@ async function callOpenRouterServer(prompt: string, maxTokens: number, temperatu
         'HTTP-Referer': APP_URL,
         'X-Title': 'KLAROS Analytics',
       },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature }),
+      body: JSON.stringify(body),
     });
 
     if (response.status === 429) continue;
@@ -393,7 +438,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (GROQ_KEY) {
     try {
-      const text = await callGroqServer(prompt, safeMaxTokens, temperature);
+      const text = await callGroqServer(prompt, safeMaxTokens, temperature, requireJson);
       return await sendAndCacheResponse(text);
     } catch (err) {
       providerAttempts.push(`Groq: ${String(err).slice(0, 80)}`);
@@ -402,7 +447,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (OR_KEY) {
     try {
-      const text = await callOpenRouterServer(prompt, safeMaxTokens, temperature);
+      const text = await callOpenRouterServer(prompt, safeMaxTokens, temperature, requireJson);
       return await sendAndCacheResponse(text);
     } catch (err) {
       providerAttempts.push(`OpenRouter: ${String(err).slice(0, 80)}`);
