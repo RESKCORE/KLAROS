@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KLAROS — System Architecture & Mathematical AHP Algorithm Guide</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 16mm 14mm 18mm 14mm;
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: 'Inter', sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "KLAROS Decision Intelligence — Architecture & Algorithm Guide";
+        font-family: 'Inter', sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #1e293b;
+      line-height: 1.5;
+      font-size: 9.5pt;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    /* Cover / Header Banner */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+      color: #ffffff;
+      padding: 24px 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+    }
+
+    .header-badge {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.25);
+      border: 1px solid rgba(165, 180, 252, 0.4);
+      color: #e0e7ff;
+      font-size: 7.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      margin-bottom: 10px;
+    }
+
+    .header-title {
+      font-size: 18pt;
+      font-weight: 800;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .header-subtitle {
+      font-size: 9.5pt;
+      color: #cbd5e1;
+      margin: 0 0 14px 0;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 14px;
+      font-size: 8pt;
+      color: #94a3b8;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .header-meta span strong {
+      color: #f1f5f9;
+    }
+
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: 12.5pt;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 5px;
+      margin-top: 22px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2 .section-num {
+      background: #4f46e5;
+      color: #ffffff;
+      font-size: 8.5pt;
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-weight: 700;
+    }
+
+    h3 {
+      font-size: 10.5pt;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: #1e293b;
+      page-break-after: avoid;
+    }
+
+    h4 {
+      font-size: 9.5pt;
+      margin-top: 10px;
+      margin-bottom: 4px;
+      color: #334155;
+    }
+
+    p {
+      margin: 0 0 8px 0;
+    }
+
+    /* Cards and Callouts */
+    .callout {
+      background: #f8fafc;
+      border-left: 4px solid #4f46e5;
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 12px;
+      font-size: 9pt;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: #312e81;
+      margin-bottom: 4px;
+      font-size: 9.5pt;
+    }
+
+    .callout-success {
+      background: #f0fdf4;
+      border-left-color: #16a34a;
+      color: #14532d;
+    }
+
+    .callout-warning {
+      background: #fffbeb;
+      border-left-color: #f59e0b;
+      color: #78350f;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px 0;
+      font-size: 8pt;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 5px 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .table-math th {
+      background: #ede9fe;
+      color: #4338ca;
+    }
+
+    /* Formula Blocks */
+    .math-block {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 8px 0 12px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5pt;
+      color: #0f172a;
+      line-height: 1.45;
+    }
+
+    .math-formula {
+      font-size: 9.5pt;
+      font-weight: 600;
+      color: #4338ca;
+      margin-bottom: 3px;
+    }
+
+    .step-badge {
+      display: inline-block;
+      background: #e0e7ff;
+      color: #4338ca;
+      font-weight: 700;
+      font-size: 7.5pt;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-right: 4px;
+    }
+
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7.5pt;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 6px 0 10px 0;
+      line-height: 1.35;
+      page-break-inside: avoid;
+    }
+
+    .speech-bubble {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0284c7;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-style: italic;
+      color: #0f172a;
+      font-size: 8.5pt;
+      page-break-inside: avoid;
+    }
+
+    .speech-bubble strong {
+      font-style: normal;
+      color: #0369a1;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .rank-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+
+    .rank-1 {
+      border-left: 4px solid #16a34a;
+      background: #f0fdf4;
+    }
+
+    .rank-2 {
+      border-left: 4px solid #3b82f6;
+    }
+
+    .rank-3 {
+      border-left: 4px solid #94a3b8;
+    }
+
+    .highlight-inr {
+      font-weight: 700;
+      color: #0f766e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Banner -->
+  <div class="header-banner">
+    <div class="header-badge">Academic Final-Year Defense & Guide Reference</div>
+    <div class="header-title">KLAROS — System Architecture & Mathematical AHP Algorithm Guide</div>
+    <div class="header-subtitle">
+      A Hybrid Decision Support Platform Combining Client-Side Operational Analytics, Multi-Provider LLM Orchestration, and the Deterministic Analytic Hierarchy Process (AHP).
+    </div>
+    <div class="header-meta">
+      <span><strong>Domain:</strong> Applied AI / Decision Intelligence</span>
+      <span><strong>Core Algorithm:</strong> Saaty Analytic Hierarchy Process (AHP)</span>
+      <span><strong>Currency Standard:</strong> Indian Rupee (₹ INR)</span>
+      <span><strong>Frameworks:</strong> React 18 + Node 20 Serverless + Supabase</span>
+    </div>
+  </div>
+
+  <!-- Section 1 -->
+  <h2><span class="section-num">1</span> Executive Pitch: Explaining KLAROS in 2 Minutes</h2>
+  <div class="speech-bubble">
+    <strong>Verbal Pitch for Your Guide / Examiner:</strong><br>
+    "Respected Guide and Panel Members, most retail analytics tools are either <em>purely descriptive dashboards</em> (showing past charts without recommending actions) or <em>unreliable black-box LLM chatbots</em> (which hallucinate numbers, fail basic arithmetic, and make logically inconsistent decisions).<br><br>
+    <strong>KLAROS is a hybrid Decision Intelligence platform</strong> that decouples qualitative evaluation from arithmetic computation:
+    <ol style="margin: 4px 0 0 14px; padding: 0;">
+      <li><strong>Deterministic Analytics (Web Worker):</strong> Ingests raw multi-format spreadsheets and calculates exact financial KPIs (revenues in ₹, margins %, stockout ratios) off the main thread.</li>
+      <li><strong>Qualitative AI Evaluator (LLM):</strong> Evaluates business trade-offs and generates <em>1-to-1 pairwise comparisons</em> on Saaty's 1–9 fundamental scale.</li>
+      <li><strong>Deterministic Math Engine (AHP):</strong> Takes pairwise comparisons in TypeScript, builds positive reciprocal matrices, derives criteria weights via the <strong>Geometric Mean Method</strong>, verifies logical consistency via the <strong>Consistency Ratio (CR &lt; 0.10)</strong>, and synthesizes 100-point ranked decision scores.</li>
+    </ol>
+    This guarantees <strong>zero arithmetic hallucinations, 100% mathematical reproducibility, and provable logical consistency</strong>."
+  </div>
+
+  <!-- Section 2 -->
+  <h2><span class="section-num">2</span> End-to-End System Architecture</h2>
+  <p>The system operates across 4 coordinated tiers designed for low operating cost, zero client-key exposure in production, and high client responsiveness:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%;">Architecture Tier</th>
+        <th style="width: 28%;">Component / File</th>
+        <th>Engineering Mechanics & Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Ingestion & Normalization</strong></td>
+        <td><code>document-extractor.ts</code><br><code>schema-mapper.ts</code></td>
+        <td>Universal multi-format parser (CSV, XLSX, JSON, XML, TXT). Uses synonym dictionaries & fuzzy matching to normalize raw headers and auto-heal missing fields (e.g. deriving Total Revenue = Unit Price × Quantity in ₹).</td>
+      </tr>
+      <tr>
+        <td><strong>2. Deterministic KPI Processing</strong></td>
+        <td><code>market-metrics.worker.ts</code><br><code>market-metrics-core.ts</code></td>
+        <td>Pure Web Worker engine computing gross margins, stock ratios, and inventory value off-thread. Uses Schwartzian transforms for O(n) chronological sorting.</td>
+      </tr>
+      <tr>
+        <td><strong>3. AI Fallback Dispatcher</strong></td>
+        <td><code>/api/llm</code> (Vercel Node 20)<br><code>llm-proxy-client.ts</code></td>
+        <td>Serverless proxy with zero-dependency RS256 Web Crypto Clerk JWT authentication. Multi-provider failover: <strong>Groq (Llama 3.3 70B) ➔ OpenRouter (DeepSeek V4) ➔ Gemini (2.5 Flash)</strong> with Upstash Redis caching (24h TTL).</td>
+      </tr>
+      <tr>
+        <td><strong>4. AHP Mathematical Engine</strong></td>
+        <td><code>ahp-math.ts</code><br><code>analysis-schema.ts</code></td>
+        <td>Saaty scale clamping [1/9, 9], positive reciprocal matrix construction, Geometric Mean priority vectors, Principal Eigenvalue (λ_max), and Consistency Ratio (CR &lt; 0.10) validation.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 3 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">3</span> Complete Mathematical AHP Walkthrough with Indian Rupee (₹) Example</h2>
+  <p>To demonstrate the exact formulas, let us trace a real execution with a sample 3-product supermarket batch.</p>
+
+  <h3>3.1 The Sample Supermarket Dataset</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Product Name</th>
+        <th>Unit Price (P)</th>
+        <th>Unit Cost (C)</th>
+        <th>Daily Units Sold (Q)</th>
+        <th>Current Stock (S)</th>
+        <th>Reorder Point (R)</th>
+        <th>Operational Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>SKU-01</strong></td>
+        <td>Fresh Milk 1L</td>
+        <td><span class="highlight-inr">₹60</span></td>
+        <td><span class="highlight-inr">₹50</span></td>
+        <td>100 units</td>
+        <td>20 units</td>
+        <td>80 units</td>
+        <td><span style="color: #dc2626; font-weight: 600;">Critical Stockout (S &lt; R)</span></td>
+      </tr>
+      <tr>
+        <td><strong>SKU-02</strong></td>
+        <td>Gourmet Cookies</td>
+        <td><span class="highlight-inr">₹200</span></td>
+        <td><span class="highlight-inr">₹80</span></td>
+        <td>10 units</td>
+        <td>500 units</td>
+        <td>50 units</td>
+        <td><span style="color: #d97706; font-weight: 600;">Severe Overstock (10x R)</span></td>
+      </tr>
+      <tr>
+        <td><strong>SKU-03</strong></td>
+        <td>Organic Rice 5kg</td>
+        <td><span class="highlight-inr">₹500</span></td>
+        <td><span class="highlight-inr">₹400</span></td>
+        <td>20 units</td>
+        <td>40 units</td>
+        <td>40 units</td>
+        <td><span style="color: #16a34a; font-weight: 600;">Balanced (S = R)</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Deterministic Financial KPI Computation (TypeScript Web Worker)</h3>
+  <div class="math-block">
+    <div class="math-formula">1. Total Revenue = Σ (Unit Price × Quantity)</div>
+    Revenue = (₹60 × 100) + (₹200 × 10) + (₹500 × 20) = ₹6,000 + ₹2,000 + ₹10,000 = <strong>₹18,000</strong>
+    <br><br>
+    <div class="math-formula">2. Total Cost = Σ (Unit Cost × Quantity)</div>
+    Cost = (₹50 × 100) + (₹80 × 10) + (₹400 × 20) = ₹5,000 + ₹800 + ₹8,000 = <strong>₹13,800</strong>
+    <br><br>
+    <div class="math-formula">3. Net Profit & Gross Profit Margin %</div>
+    Profit = ₹18,000 - ₹13,800 = <strong>₹4,200</strong><br>
+    Margin % = (₹4,200 / ₹18,000) × 100 = <strong>23.33%</strong>
+    <br><br>
+    <div class="math-formula">4. Product Margins & Stockout Ratios (Stock / Reorder)</div>
+    • Fresh Milk: Margin = (60 - 50)/60 = <strong>16.67%</strong> | Stock Ratio = 20 / 80 = <strong>0.25 (Critical Alert)</strong><br>
+    • Gourmet Cookies: Margin = (200 - 80)/200 = <strong>60.00%</strong> | Stock Ratio = 500 / 50 = <strong>10.0 (Overstocked)</strong><br>
+    • Organic Rice: Margin = (500 - 400)/500 = <strong>20.00%</strong> | Stock Ratio = 40 / 40 = <strong>1.00 (Balanced)</strong>
+  </div>
+
+  <h3>3.3 What the LLM Generates (Qualitative Strategy & Pairwise Comparisons)</h3>
+  <p>The LLM receives the structured KPI summary and returns <strong>3 Strategic Options</strong>, <strong>3 Evaluation Criteria</strong>, and <strong>Saaty 1–9 Comparison Triples</strong>:</p>
+
+  <div class="grid-2">
+    <div style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+      <strong>3 Strategic Alternatives (O):</strong>
+      <ul style="margin: 4px 0 0 12px; padding: 0; font-size: 8pt;">
+        <li><strong>O1:</strong> Emergency Milk Restock & Supplier Reorder</li>
+        <li><strong>O2:</strong> Discount Promotion on Gourmet Cookies (Clear Stock)</li>
+        <li><strong>O3:</strong> Maintain Status Quo & Monitor Weekly Velocity</li>
+      </ul>
+    </div>
+    <div style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+      <strong>3 Evaluation Criteria (C):</strong>
+      <ul style="margin: 4px 0 0 12px; padding: 0; font-size: 8pt;">
+        <li><strong>C1:</strong> Stockout & Revenue Risk Mitigation</li>
+        <li><strong>C2:</strong> Immediate Profit Margin Preservation</li>
+        <li><strong>C3:</strong> Working Capital & Holding Cost Liquidation</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="margin-top: 8px;"><strong>Criteria Comparison Triple:</strong> <code>[C1 vs C2 = 3, C1 vs C3 = 2, C2 vs C3 = 1]</code> (on Saaty's 1–9 Scale).</p>
+
+  <!-- Section 3.4 -->
+  <div class="page-break"></div>
+  <h3>3.4 Building the Positive Reciprocal Criteria Matrix (M_C)</h3>
+  <p>Given the comparison triple [a01 = 3, a02 = 2, a12 = 1], <code>buildPairwiseMatrix()</code> builds the 3×3 reciprocal matrix:</p>
+
+  <div class="math-block">
+    <div class="math-formula">Matrix M_C = [ [1, c01, c02], [1/c01, 1, c12], [1/c02, 1/c12, 1] ]</div>
+    [ 1.000,  3.000,  2.000 ]<br>
+    [ 0.333,  1.000,  1.000 ]<br>
+    [ 0.500,  1.000,  1.000 ]
+  </div>
+
+  <h3>3.5 Deriving Criteria Weights via Geometric Mean Method</h3>
+  <p>In <code>calculatePriorityVector(matrix)</code>:</p>
+  <div class="math-block">
+    <div class="math-formula">Step 1: Compute Row Geometric Means: GM_i = (a_i1 × a_i2 × a_i3)^(1/3)</div>
+    • Row 1 (C1: Stockout Risk): GM_1 = (1.0 × 3.0 × 2.0)^(1/3) = (6.0)^(1/3) = <strong>1.8171</strong><br>
+    • Row 2 (C2: Margin Preservation): GM_2 = (0.3333 × 1.0 × 1.0)^(1/3) = (0.3333)^(1/3) = <strong>0.6934</strong><br>
+    • Row 3 (C3: Capital Liquidation): GM_3 = (0.5000 × 1.0 × 1.0)^(1/3) = (0.5000)^(1/3) = <strong>0.7937</strong><br><br>
+    <div class="math-formula">Step 2: Sum Geometric Means & Normalize: w_i = GM_i / Σ GM_k</div>
+    Sum Σ GM = 1.8171 + 0.6934 + 0.7937 = <strong>3.3042</strong><br><br>
+    • <strong>Weight w_1 (C1):</strong> 1.8171 / 3.3042 = <strong>0.5499 (55.0%)</strong><br>
+    • <strong>Weight w_2 (C2):</strong> 0.6934 / 3.3042 = <strong>0.2098 (21.0%)</strong><br>
+    • <strong>Weight w_3 (C3):</strong> 0.7937 / 3.3042 = <strong>0.2402 (24.0%)</strong><br>
+    Σ w_i = 0.5499 + 0.2098 + 0.2402 = <strong>1.0000 (Exact 100%)</strong>
+  </div>
+
+  <h3>3.6 Principal Eigenvalue (λ_max) & Consistency Index (CI)</h3>
+  <div class="math-block">
+    <div class="math-formula">Step 1: Compute Matrix-Vector Product: y = M_C · w</div>
+    • y_1 = (1.0 × 0.5499) + (3.0 × 0.2098) + (2.0 × 0.2402) = 0.5499 + 0.6294 + 0.4804 = <strong>1.6597</strong><br>
+    • y_2 = (0.3333 × 0.5499) + (1.0 × 0.2098) + (1.0 × 0.2402) = 0.1833 + 0.2098 + 0.2402 = <strong>0.6333</strong><br>
+    • y_3 = (0.5000 × 0.5499) + (1.0 × 0.2098) + (1.0 × 0.2402) = 0.2750 + 0.2098 + 0.2402 = <strong>0.7250</strong><br><br>
+    <div class="math-formula">Step 2: Compute λ_i = y_i / w_i and Average λ_max</div>
+    • λ_1 = 1.6597 / 0.5499 = 3.0182 | λ_2 = 0.6333 / 0.2098 = 3.0186 | λ_3 = 0.7250 / 0.2402 = 3.0183<br>
+    <strong>λ_max = (3.0182 + 3.0186 + 3.0183) / 3 = 3.0184</strong><br><br>
+    <div class="math-formula">Step 3: Compute Consistency Index: CI = (λ_max - n) / (n - 1)</div>
+    CI = (3.0184 - 3) / (3 - 1) = 0.0184 / 2 = <strong>0.0092</strong>
+  </div>
+
+  <h3>3.7 Consistency Ratio (CR) Validation</h3>
+  <div class="callout callout-success">
+    <div class="callout-title">✓ Consistency Ratio Verification (CR &lt; 0.10)</div>
+    Using Saaty's empirical Random Index for n = 3 (RI_3 = 0.58):<br>
+    <strong>CR = CI / RI_3 = 0.0092 / 0.58 = 0.0159 (1.59%)</strong><br>
+    Since <strong>CR = 0.0159 &lt; 0.10</strong>, the qualitative comparisons are mathematically consistent, transitive, and verified!
+  </div>
+
+  <h3>3.8 Global Synthesis & Final 100-Point Composite Scores</h3>
+  <p>Following the same geometric mean steps, the system computes the option priority vectors (v^(k)) for each criterion:</p>
+
+  <table class="table-math">
+    <thead>
+      <tr>
+        <th>Criterion (C_k)</th>
+        <th>Weight (w_k)</th>
+        <th>Option 1 (O1: Restock Milk)</th>
+        <th>Option 2 (O2: Promo Cookies)</th>
+        <th>Option 3 (O3: Status Quo)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>C1 (Stockout Risk)</strong></td>
+        <td><strong>0.550</strong></td>
+        <td>v1 = 0.731</td>
+        <td>v2 = 0.188</td>
+        <td>v3 = 0.081</td>
+      </tr>
+      <tr>
+        <td><strong>C2 (Margin Preservation)</strong></td>
+        <td><strong>0.210</strong></td>
+        <td>v1 = 0.217</td>
+        <td>v2 = 0.550</td>
+        <td>v3 = 0.233</td>
+      </tr>
+      <tr>
+        <td><strong>C3 (Capital Liquidation)</strong></td>
+        <td><strong>0.240</strong></td>
+        <td>v1 = 0.122</td>
+        <td>v2 = 0.648</td>
+        <td>v3 = 0.230</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="math-block">
+    <div class="math-formula">Composite Score Formula: S_j = Σ (w_k × v_jk) × 100</div>
+    • <strong>Score O1:</strong> [(0.550 × 0.731) + (0.210 × 0.217) + (0.240 × 0.122)] × 100 = (0.4021 + 0.0456 + 0.0293) × 100 = <strong>48 / 100</strong><br>
+    • <strong>Score O2:</strong> [(0.550 × 0.188) + (0.210 × 0.550) + (0.240 × 0.648)] × 100 = (0.1034 + 0.1155 + 0.1555) × 100 = <strong>37 / 100</strong><br>
+    • <strong>Score O3:</strong> [(0.550 × 0.081) + (0.210 × 0.233) + (0.240 × 0.230)] × 100 = (0.0446 + 0.0489 + 0.0552) × 100 = <strong>15 / 100</strong>
+  </div>
+
+  <div class="rank-card rank-1">
+    <strong>Rank 1 (Top Recommendation): Option 1 — Emergency Milk Restock (Score: 48/100)</strong><br>
+    <span style="font-size: 8pt; color: #15803d;">Heavily favored because Stockout & Revenue Risk Mitigation carries 55% of the total criteria weight.</span>
+  </div>
+  <div class="rank-card rank-2">
+    <strong>Rank 2: Option 2 — Discount Promotion on Gourmet Cookies (Score: 37/100)</strong><br>
+    <span style="font-size: 8pt; color: #1d4ed8;">Dominates on Working Capital Liquidation (v=0.648) and Margin Preservation (v=0.550).</span>
+  </div>
+  <div class="rank-card rank-3">
+    <strong>Rank 3: Option 3 — Status Quo (Score: 15/100)</strong><br>
+    <span style="font-size: 8pt; color: #475569;">Lowest priority due to compounding stockout penalties on primary revenue drivers.</span>
+  </div>
+
+  <!-- Section 4 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">4</span> Zod Schema Hardening & Runtime Validation</h2>
+  <p>In <code>src/features/decisions/core/analysis-schema.ts</code>, Zod serves as a strict runtime guard ensuring that malformed LLM outputs never crash the downstream mathematical engine:</p>
+
+  <pre><code>// 1. Saaty Scale Constraint: bounds all pairwise comparisons to [1/9, 9]
+const SaatyValueSchema = z
+  .number()
+  .min(1 / 9, 'Saaty value must be >= 1/9')
+  .max(9, 'Saaty value must be <= 9')
+  .refine((n) => Number.isFinite(n), 'Must be finite number');
+
+export const ComparisonTripleSchema = z.tuple([
+  SaatyValueSchema,
+  SaatyValueSchema,
+  SaatyValueSchema,
+]);
+
+// 2. Strict MCDA Response Schema
+export const McdaRawResponseSchema = z.object({
+  options: z.array(z.object({ id: z.string(), label: z.string() })).min(3).max(3),
+  criteria: z.array(z.object({ id: z.string(), name: z.string() })).min(3).max(3),
+  criteriaComparisons: ComparisonTripleSchema,
+  optionComparisons: z.array(ComparisonTripleSchema).min(3).max(3),
+  confidence: z.number().int().min(0).max(100),
+  recommendation: z.string().min(10),
+  reasoning: z.object({
+    decomposition: z.string(),
+    assumptions: z.array(z.string()),
+    tradeoffs: z.array(z.string()),
+    risks: z.array(z.string()),
+    sensitivity: z.string(),
+  }),
+});</code></pre>
+
+  <h2><span class="section-num">5</span> Resilient 5-Stage JSON Extraction Waterfall</h2>
+  <p>In <code>src/services/llm/core/json-extractor.ts</code>, raw LLM strings pass through 5 sequential extraction strategies:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Stage</th>
+        <th style="width: 35%;">Extraction Strategy</th>
+        <th>Defect Repaired & Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>TRY 1</strong></td>
+        <td>Direct <code>JSON.parse()</code></td>
+        <td>Executes fast path when the model outputs clean, raw JSON.</td>
+      </tr>
+      <tr>
+        <td><strong>TRY 2</strong></td>
+        <td>Regex Code-Block Extractor</td>
+        <td>Extracts content between markdown code fences and repairs trailing commas.</td>
+      </tr>
+      <tr>
+        <td><strong>TRY 3</strong></td>
+        <td>Backtick Stripping Pass</td>
+        <td>Strips conversational markdown backticks and reparses.</td>
+      </tr>
+      <tr>
+        <td><strong>TRY 4</strong></td>
+        <td>Depth Bracket State Machine</td>
+        <td>Tracks brace/bracket depth { } [ ] while correctly ignoring quotes inside strings.</td>
+      </tr>
+      <tr>
+        <td><strong>TRY 5</strong></td>
+        <td>Bounded Tail-Trim (O(n))</td>
+        <td>Trims up to 200 trailing characters to close truncated responses without quadratic overhead.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 6 -->
+  <h2><span class="section-num">6</span> Multi-Provider LLM Fallback & Retry Protocol</h2>
+  <p>To guarantee high availability against provider rate limits (HTTP 429) and quota exhaustion, KLAROS cascades through a prioritized provider chain:</p>
+
+  <div class="math-block">
+    <strong>Provider Priority Cascade:</strong><br>
+    1. <strong>Groq (Primary / Ultra-Fast):</strong> llama-3.3-70b-versatile ➔ llama-3.1-8b-instant ➔ qwen-3-32b<br>
+    2. <strong>OpenRouter (Secondary / Diversity):</strong> deepseek-v4-flash ➔ qwen3-32b ➔ llama-4-scout<br>
+    3. <strong>Google Gemini (Tertiary Fallback):</strong> gemini-2.5-flash ➔ gemini-2.0-flash ➔ gemini-1.5-flash<br><br>
+    <strong>Bounded Exponential Backoff Formula:</strong><br>
+    Delay(attempt) = min(4000, 1000 × 2^attempt + jitter) ms across 3 retry attempts.
+  </div>
+
+  <!-- Section 7 -->
+  <div class="page-break"></div>
+  <h2><span class="section-num">7</span> Zero-Trust Security & Database RLS Architecture</h2>
+  
+  <div class="grid-2">
+    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px;">
+      <h4 style="margin-top: 0; color: #1e1b4b;">Serverless RS256 Web Crypto Auth</h4>
+      <p style="font-size: 8pt;">The <code>/api/llm</code> proxy function uses Node 20's native <code>crypto.subtle</code> to verify the Clerk-issued RS256 JWT signature using Clerk's public PEM key before making any external AI API call.</p>
+      <ul style="margin: 0; padding-left: 12px; font-size: 7.5pt; color: #475569;">
+        <li>Zero dependency bundle overhead (no jsonwebtoken package).</li>
+        <li>Eliminates cold-start latency on Vercel Edge.</li>
+        <li>Secret API keys stay strictly in encrypted Vercel environment variables.</li>
+      </ul>
+    </div>
+
+    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px;">
+      <h4 style="margin-top: 0; color: #1e1b4b;">PostgreSQL Row-Level Security (RLS)</h4>
+      <p style="font-size: 8pt;">Supabase enforces strict isolation matching the authenticated Clerk token claim against the table's <code>user_id</code> column:</p>
+      <pre style="margin: 0; padding: 5px 6px; font-size: 7pt;"><code>CREATE POLICY "Users manage own decisions"
+ON decisions FOR ALL
+USING (auth.jwt() ->> 'sub' = user_id)
+WITH CHECK (auth.jwt() ->> 'sub' = user_id);</code></pre>
+    </div>
+  </div>
+
+  <!-- Section 8 -->
+  <h2><span class="section-num">8</span> Viva Presentation Q&A Cheat Sheet</h2>
+
+  <div class="callout">
+    <strong>Q1: Why did you choose AHP instead of Simple Additive Weighting (SAW)?</strong><br>
+    <em>"SAW requires arbitrary percentage assignments which are cognitively biased. AHP decomposes evaluations into 1-to-1 pairwise comparisons, computes mathematically exact weights via the Geometric Mean method, and programmatically validates judgment consistency using the Consistency Ratio (CR &lt; 0.10)."</em>
+  </div>
+
+  <div class="callout">
+    <strong>Q2: How do you prevent division by zero or NaN errors in AHP?</strong><br>
+    <em>"Our `clampSaaty()` utility clamps all comparison values to [1/9, 9] and maps non-finite values to 1.0 (equal importance). In `calculatePriorityVector()`, if the geometric mean sum is zero, it safely falls back to a uniform distribution [1/n, ..., 1/n]."</em>
+  </div>
+
+  <div class="callout">
+    <strong>Q3: How do you ensure high performance during 50MB CSV uploads?</strong><br>
+    <em>"All dataset metric calculations run off-thread in a dedicated Web Worker (`market-metrics.worker.ts`). Sorting uses Schwartzian transforms to avoid O(n log n) Date object allocations, ensuring the React UI remains at 60 FPS."</em>
+  </div>
+
+  <div class="callout">
+    <strong>Q4: Is the revenue forecast generated by an ML model or LLM?</strong><br>
+    <em>"It is generated via structured in-context LLM time-series extrapolation using the last 30 daily data points. It is not an ARIMA or Prophet statistical model, which we have transparently documented in our limitations."</em>
+  </div>
+
+</body>
+</html>
