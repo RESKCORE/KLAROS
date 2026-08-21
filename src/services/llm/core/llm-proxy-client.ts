@@ -53,7 +53,7 @@ export function hasApiKey(): boolean {
 interface ClerkWindow extends Window {
   Clerk?: {
     session?: {
-      getToken(opts: { template: string }): Promise<string | null>;
+      getToken(opts?: { template?: string }): Promise<string | null>;
     };
   };
 }
@@ -61,7 +61,25 @@ interface ClerkWindow extends Window {
 async function getClerkToken(): Promise<string | null> {
   try {
     const clerkWindow = window as unknown as ClerkWindow;
-    return (await clerkWindow.Clerk?.session?.getToken({ template: 'supabase' })) ?? null;
+    if (!clerkWindow.Clerk?.session) return null;
+
+    // 1. Try default session token (always present for logged-in Clerk user)
+    try {
+      const token = await clerkWindow.Clerk.session.getToken();
+      if (token) return token;
+    } catch {
+      // Fallback
+    }
+
+    // 2. Try custom supabase template if configured
+    try {
+      const token = await clerkWindow.Clerk.session.getToken({ template: 'supabase' });
+      if (token) return token;
+    } catch {
+      // Fallback
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -93,7 +111,7 @@ async function callViaProxy(prompt: string, options: LLMCallOptions): Promise<st
       if (body.error) errorMsg = body.error;
     } catch { /* ignore */ }
     if (response.status === 401) {
-      throw new Error('AUTH_REQUIRED: Your session has expired. Please sign in again.');
+      throw new Error(`AUTH_REQUIRED: Your session has expired. Please sign in again. (${errorMsg})`);
     }
     throw new Error(errorMsg);
   }

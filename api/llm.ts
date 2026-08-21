@@ -81,8 +81,46 @@ async function computeCacheKey(
 
 // ─── JWT Verification ─────────────────────────────────────────────────────────
 
+const jwkCache = new Map<string, CryptoKey>();
+
 /**
- * Verifies a Clerk-issued JWT using the RS256 public key.
+ * Fetches and imports the JWK public key from the Clerk JWKS endpoint.
+ */
+async function getJwkPublicKey(iss: string, kid?: string): Promise<CryptoKey | null> {
+  const cacheKey = `${iss}:${kid ?? 'default'}`;
+  if (jwkCache.has(cacheKey)) {
+    return jwkCache.get(cacheKey)!;
+  }
+
+  try {
+    const jwksUrl = iss.endsWith('/') ? `${iss}.well-known/jwks.json` : `${iss}/.well-known/jwks.json`;
+    const res = await fetch(jwksUrl, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+
+    const jwks = (await res.json()) as { keys?: Array<JsonWebKey & { kid?: string; alg?: string }> };
+    if (!jwks.keys || jwks.keys.length === 0) return null;
+
+    const matchedKey = kid ? jwks.keys.find((k) => k.kid === kid) ?? jwks.keys[0] : jwks.keys[0];
+    if (!matchedKey) return null;
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'jwk',
+      matchedKey,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+
+    jwkCache.set(cacheKey, cryptoKey);
+    return cryptoKey;
+  } catch (err) {
+    console.warn('[llm proxy] Failed to fetch JWKS from issuer:', err);
+    return null;
+  }
+}
+
+/**
+ * Verifies a Clerk-issued JWT using the RS256 public key (PEM key or automatic JWKS endpoint).
  * We use the Web Crypto API (available in Node 20+) so there is zero
  * dependency overhead — no jsonwebtoken package needed in the serverless bundle.
  *
@@ -92,16 +130,9 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
   if (!authHeader?.startsWith('Bearer ')) {
     throw new Error('Missing or malformed Authorization header');
   }
-  const token = authHeader.slice(7);
-
-  if (!CLERK_JWT_KEY) {
-    // In local development without CLERK_JWT_KEY configured, skip verification
-    // but emit a loud warning so it is never silently bypassed in production.
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('CLERK_JWT_KEY environment variable is not configured');
-    }
-    console.warn('[llm proxy] CLERK_JWT_KEY not set — skipping JWT verification (dev only)');
-    return;
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    throw new Error('Empty bearer token provided');
   }
 
   // Decode the JWT without verification first to extract the header/payload
@@ -109,7 +140,15 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
   if (parts.length !== 3) throw new Error('Invalid JWT structure');
 
   const [headerB64, payloadB64, sigB64] = parts;
-  const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+  let header: { kid?: string; alg?: string } = {};
+  let payload: { exp?: number; iss?: string; sub?: string } = {};
+
+  try {
+    header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+    payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+  } catch {
+    throw new Error('Failed to parse JWT payload or header');
+  }
 
   // Check expiration
   const now = Math.floor(Date.now() / 1000);
@@ -117,34 +156,61 @@ async function verifyClerkJwt(authHeader: string | undefined): Promise<void> {
     throw new Error('JWT has expired');
   }
 
-  // Import the RSA public key
-  const pemBody = CLERK_JWT_KEY
-    .replace(/-----BEGIN PUBLIC KEY-----/, '')
-    .replace(/-----END PUBLIC KEY-----/, '')
-    .replace(/\s/g, '');
-  const keyBuffer = Buffer.from(pemBody, 'base64');
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'spki',
-    keyBuffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  );
-
-  // Verify signature
   const signingInput = `${headerB64}.${payloadB64}`;
   const signatureBuffer = Buffer.from(sigB64, 'base64url');
-  const isValid = await crypto.subtle.verify(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    signatureBuffer,
-    Buffer.from(signingInput),
-  );
 
-  if (!isValid) {
-    throw new Error('JWT signature verification failed');
+  // Option A: Try verifying with CLERK_JWT_KEY (PEM) if configured
+  if (CLERK_JWT_KEY) {
+    try {
+      const pemBody = CLERK_JWT_KEY
+        .replace(/-----BEGIN PUBLIC KEY-----/, '')
+        .replace(/-----END PUBLIC KEY-----/, '')
+        .replace(/\s/g, '');
+      const keyBuffer = Buffer.from(pemBody, 'base64');
+
+      const cryptoKey = await crypto.subtle.importKey(
+        'spki',
+        keyBuffer,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        false,
+        ['verify'],
+      );
+
+      const isValid = await crypto.subtle.verify(
+        'RSASSA-PKCS1-v1_5',
+        cryptoKey,
+        signatureBuffer,
+        Buffer.from(signingInput),
+      );
+
+      if (isValid) return; // Verified successfully!
+    } catch (pemErr) {
+      console.warn('[llm proxy] PEM verification attempt failed, attempting JWKS fallback:', pemErr);
+    }
   }
+
+  // Option B: Auto-discover public key from Clerk JWKS endpoint if issuer is present
+  if (payload.iss && (payload.iss.includes('clerk') || payload.iss.startsWith('https://'))) {
+    const jwkKey = await getJwkPublicKey(payload.iss, header.kid);
+    if (jwkKey) {
+      const isValid = await crypto.subtle.verify(
+        'RSASSA-PKCS1-v1_5',
+        jwkKey,
+        signatureBuffer,
+        Buffer.from(signingInput),
+      );
+      if (isValid) return; // Verified successfully!
+      throw new Error('JWT signature verification failed against Clerk JWKS');
+    }
+  }
+
+  // Option C: Local dev fallback when no public key could be found
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('[llm proxy] Could not verify Clerk JWT signature in dev mode — allowing request');
+    return;
+  }
+
+  throw new Error('CLERK_JWT_KEY is not configured and JWKS could not be fetched');
 }
 
 // ─── Per-Request Timeout ──────────────────────────────────────────────────────
@@ -280,8 +346,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await verifyClerkJwt(req.headers.authorization);
   } catch (authErr) {
-    console.error('[llm proxy] Auth failed:', authErr);
-    return res.status(401).json({ error: 'Unauthorized' });
+    const errorMsg = authErr instanceof Error ? authErr.message : 'Unauthorized';
+    console.error('[llm proxy] Auth failed:', errorMsg);
+    return res.status(401).json({ error: errorMsg });
   }
 
   // ── Parse body ──────────────────────────────────────────────────────────────

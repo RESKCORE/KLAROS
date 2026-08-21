@@ -45,6 +45,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(
   supabaseUrl ?? 'http://localhost:54321',
   supabaseAnonKey ?? 'placeholder-anon-key',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  },
 );
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -64,7 +71,7 @@ export class AuthRequiredError extends Error {
 // ─── Clerk Window Typing ──────────────────────────────────────────────────────
 
 interface ClerkSession {
-  getToken(options: { template: string }): Promise<string | null>;
+  getToken(options?: { template?: string }): Promise<string | null>;
 }
 
 interface ClerkWindow extends Window {
@@ -125,15 +132,19 @@ export async function getSupabaseClient(
         return supabase;
       }
 
-      let token: string | null;
+      let token: string | null = null;
       try {
         token = await clerkWindow.Clerk.session.getToken({ template: 'supabase' });
-      } catch (err) {
-        console.error('[Supabase] Failed to retrieve Clerk JWT:', err);
-        if (requireAuth) {
-          throw new AuthRequiredError('Failed to obtain a Clerk JWT. Your session may have expired.');
+      } catch {
+        // Fallback to default session token if custom 'supabase' template isn't defined
+      }
+
+      if (!token) {
+        try {
+          token = await clerkWindow.Clerk.session.getToken();
+        } catch (err) {
+          console.error('[Supabase] Failed to retrieve Clerk JWT:', err);
         }
-        return supabase;
       }
 
       if (!token) {
@@ -157,6 +168,11 @@ export async function getSupabaseClient(
         supabaseUrl ?? 'http://localhost:54321',
         supabaseAnonKey ?? 'placeholder-anon-key',
         {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
           global: {
             headers: { Authorization: `Bearer ${token}` },
           },
