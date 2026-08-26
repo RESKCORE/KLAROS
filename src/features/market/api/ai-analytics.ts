@@ -7,6 +7,7 @@ import {
   type AiStructuredInsight,
   type AiForecastPoint,
 } from '@/services/llm/llm-service';
+import { readCache, writeCache } from '@/lib/cache';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,23 +33,6 @@ function cacheKey(dataSourceId: string): string {
   return `klaros:ai-analytics:${CACHE_VERSION}:${dataSourceId}:${hourBucket}`;
 }
 
-function readCache(key: string): AiAnalytics | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as AiAnalytics) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key: string, value: AiAnalytics): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Ignore quota errors
-  }
-}
-
 // In-memory dedup: prevents parallel identical fetches
 const inFlight = new Map<string, Promise<AiAnalytics>>();
 
@@ -61,7 +45,7 @@ export async function getAiAnalytics(
   const key = cacheKey(dataSourceId);
 
   // 1. Check localStorage cache
-  const cached = readCache(key);
+  const cached = readCache<AiAnalytics>(key);
   if (cached) {
     console.log('[AiAnalytics] ✅ Returning cached result');
     return cached;

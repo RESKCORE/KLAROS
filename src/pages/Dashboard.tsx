@@ -283,11 +283,15 @@ export default function Dashboard() {
   };
 
   const stats = useMemo(() => {
-    const total = decisions.length;
-    const completed = decisions.filter((d) => d.status === 'done').length;
-    const running = decisions.filter((d) => d.status === 'analyzing').length;
-    const biLinked = decisions.filter((d) => d.data_source_id).length;
-    return { total, completed, running, biLinked };
+    let completed = 0;
+    let running = 0;
+    let biLinked = 0;
+    for (const d of decisions) {
+      if (d.status === 'done') completed++;
+      else if (d.status === 'analyzing') running++;
+      if (d.data_source_id) biLinked++;
+    }
+    return { total: decisions.length, completed, running, biLinked };
   }, [decisions]);
 
   const latestCompletedDecision = useMemo(() => {

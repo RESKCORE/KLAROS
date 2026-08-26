@@ -14,7 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getDecision } from '@/features/decisions/store/decision-store';
 import { getCachedDataSources, getMarketMetricsForSource, getDataSources, autoAnalyze } from '@/features/market/api/bi-api';
 import { getAiAnalytics, hasAiApiKey, type AiAnalytics } from '@/features/market/api/ai-analytics';
-import { askQuestion } from '@/services/llm/llm-service';
+import { DecisionKpiCards } from '@/features/decisions/components/DecisionKpiCards';
+import { DecisionChatWidget } from '@/features/decisions/components/DecisionChatWidget';
 import type { Decision } from '@/features/decisions/types/decision';
 import type { MarketMetrics } from '@/features/market/utils/market-metrics';
 import type { DataSourceSummary } from '@/features/market/api/bi-api';
@@ -69,38 +70,26 @@ function getProductCategory(name: string, sku: string): string {
   return 'General';
 }
 
-function getCategoryColor(category: string): string {
+const CATEGORY_META: Record<string, { color: string; badgeClass: string; emoji: string }> = {
+  beverage: { color: '#3b82f6', badgeClass: 'bg-blue-50 text-blue-700 border-blue-100', emoji: '🥤' },
+  grocer: { color: '#10b981', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100', emoji: '🛒' },
+  bakery: { color: '#f59e0b', badgeClass: 'bg-amber-50 text-amber-700 border-amber-100', emoji: '🍞' },
+  dairy: { color: '#ef4444', badgeClass: 'bg-rose-50 text-rose-700 border-rose-100', emoji: '🥛' },
+  produce: { color: '#8b5cf6', badgeClass: 'bg-purple-50 text-purple-700 border-purple-100', emoji: '🍎' },
+  snack: { color: '#06b6d4', badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-100', emoji: '🍿' },
+};
+
+function getCategoryMeta(category: string) {
   const c = category.toLowerCase();
-  if (c.includes('beverage')) return '#3b82f6'; // blue
-  if (c.includes('grocer')) return '#10b981'; // green
-  if (c.includes('bakery')) return '#f59e0b'; // orange
-  if (c.includes('dairy')) return '#ef4444'; // red
-  if (c.includes('produce')) return '#8b5cf6'; // purple
-  if (c.includes('snack')) return '#06b6d4'; // cyan
-  return '#64748b'; // slate
+  const match = Object.keys(CATEGORY_META).find((k) => c.includes(k));
+  return match
+    ? CATEGORY_META[match]
+    : { color: '#64748b', badgeClass: 'bg-slate-50 text-slate-700 border-slate-100', emoji: '📦' };
 }
 
-function getCategoryBadgeClass(category: string): string {
-  const c = category.toLowerCase();
-  if (c.includes('beverage')) return 'bg-blue-50 text-blue-700 border-blue-100';
-  if (c.includes('grocer')) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-  if (c.includes('bakery')) return 'bg-amber-50 text-amber-700 border-amber-100';
-  if (c.includes('dairy')) return 'bg-rose-50 text-rose-700 border-rose-100';
-  if (c.includes('produce')) return 'bg-purple-50 text-purple-700 border-purple-100';
-  if (c.includes('snack')) return 'bg-cyan-50 text-cyan-700 border-cyan-100';
-  return 'bg-slate-50 text-slate-700 border-slate-100';
-}
-
-function getCategoryEmoji(category: string): string {
-  const c = category.toLowerCase();
-  if (c.includes('beverage')) return '🥤';
-  if (c.includes('grocer')) return '🛒';
-  if (c.includes('bakery')) return '🍞';
-  if (c.includes('dairy')) return '🥛';
-  if (c.includes('produce')) return '🍎';
-  if (c.includes('snack')) return '🍿';
-  return '📦';
-}
+const getCategoryColor = (cat: string) => getCategoryMeta(cat).color;
+const getCategoryBadgeClass = (cat: string) => getCategoryMeta(cat).badgeClass;
+const getCategoryEmoji = (cat: string) => getCategoryMeta(cat).emoji;
 
 export default function DecisionResult() {
   const { id } = useParams<{ id: string }>();
@@ -126,13 +115,6 @@ export default function DecisionResult() {
   // Interactivity states
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [productSearch, setProductSearch] = useState('');
-
-  // AI Chat Assistant states
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-analyze dialog states
   const [dataSources, setDataSources] = useState<DataSourceSummary[]>([]);
@@ -243,13 +225,6 @@ export default function DecisionResult() {
     }
   }, [decision?.data_source_id]);
 
-  // Scroll chatbot to end on new message
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, chatLoading]);
-
   async function loadDecision() {
     try {
       setIsLoading(true);
@@ -299,35 +274,6 @@ export default function DecisionResult() {
       });
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  // Chat request dispatch
-  const handleSendChat = async () => {
-    if (!chatInput.trim() || chatLoading || !metrics) return;
-    const userMsg = chatInput.trim();
-    setChatInput('');
-    setChatMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
-    setChatLoading(true);
-
-    try {
-      const history = chatMessages;
-      const metricsJson = JSON.stringify({
-        kpis: metrics.kpis,
-        topProducts: metrics.topProducts.slice(0, 8),
-        revenueByCategory: metrics.revenueByCategory,
-        lowStockCount: metrics.kpis.lowStockCount,
-      });
-      const answer = await askQuestion(userMsg, metricsJson, history);
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
-    } catch (err) {
-      console.error(err);
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'AI assistant is temporarily unavailable. Check your internet connection or API key configurations.' },
-      ]);
-    } finally {
-      setChatLoading(false);
     }
   };
 
@@ -464,84 +410,11 @@ export default function DecisionResult() {
           </div>
 
         {/* ── KPI Cards Row (Vibrant HSL, rupee-formatted) ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          
-          {/* Card 1: Total Revenue */}
-          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
-            <div className="flex items-start justify-between">
-              <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-                <IndianRupee className="h-5 w-5" />
-              </div>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-medium text-slate-400">Total Revenue</p>
-              <h2 className="text-2xl font-semibold text-slate-800 mt-1 tracking-tight">
-                {currencyFormatter.format(metrics.kpis.totalRevenue)}
-              </h2>
-              <p className="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
-                +{metrics.kpis.profitMarginPct.toFixed(1)}% <span className="text-slate-400 font-medium">margin</span>
-              </p>
-            </div>
-          </Card>
-
-          {/* Card 2: Total Units Sold */}
-          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
-            <div className="flex items-start justify-between">
-              <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Package className="h-5 w-5" />
-              </div>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-medium text-slate-400">Total Units Sold</p>
-              <h2 className="text-2xl font-semibold text-slate-800 mt-1 tracking-tight">
-                {numberFormatter.format(metrics.kpis.totalUnits)} <span className="text-sm font-medium text-slate-500">items</span>
-              </h2>
-              <p className="text-xs font-medium text-slate-500 mt-1">
-                {metrics.kpis.skuCount} SKUs <span className="text-slate-400 font-medium">active</span>
-              </p>
-            </div>
-          </Card>
-
-          {/* Card 3: Low Stock SKUs */}
-          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
-            <div className="flex items-start justify-between">
-              <div className="h-10 w-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-                <Tag className="h-5 w-5" />
-              </div>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-medium text-slate-400">Low Stock SKUs</p>
-              <h2 className="text-2xl font-semibold text-slate-800 mt-1 tracking-tight">
-                {metrics.kpis.lowStockCount} <span className="text-sm font-medium text-slate-500">items</span>
-              </h2>
-              <p className="text-xs font-medium text-rose-500 mt-1">
-                {metrics.kpis.avgDiscount.toFixed(2)}% <span className="text-slate-400 font-medium">avg discount</span>
-              </p>
-            </div>
-          </Card>
-
-          {/* Card 4: Net Profit */}
-          <Card className="rounded-3xl border border-slate-100/60 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-36">
-            <div className="flex items-start justify-between">
-              <div className="h-10 w-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600">
-                <Activity className="h-5 w-5" />
-              </div>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-medium text-slate-400">Net Profit</p>
-              <h2 className="text-2xl font-semibold text-slate-800 mt-1 tracking-tight">
-                {currencyFormatter.format(metrics.kpis.totalProfit)}
-              </h2>
-              <p className="text-xs font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
-                +{metrics.kpis.profitMarginPct.toFixed(1)}% <span className="text-slate-400 font-medium">margin</span>
-              </p>
-            </div>
-          </Card>
-        </div>
+        <DecisionKpiCards
+          kpis={metrics.kpis}
+          currencyFormatter={currencyFormatter}
+          numberFormatter={numberFormatter}
+        />
 
         {/* ── Main Charts Content (Report Analytics + Top Products) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
@@ -984,89 +857,8 @@ export default function DecisionResult() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Floating AI Chat Bubble & Q&A drawer (Premium Chatbot) ── */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        {chatOpen && (
-          <div className="w-80 sm:w-96 bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[420px] transition-all duration-300 transform scale-100 origin-bottom-right">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-wider">Klaros AI Companion</span>
-              </div>
-              <button onClick={() => setChatOpen(false)} className="text-[10px] bg-white/15 hover:bg-white/25 border border-white/10 text-white font-medium rounded-lg px-2.5 py-1 transition-colors">
-                Hide
-              </button>
-            </div>
-
-            {/* Chat list */}
-            <ScrollArea className="flex-1 p-4 bg-slate-50/50">
-              {chatMessages.length === 0 ? (
-                <div className="text-center py-16 space-y-2">
-                  <div className="h-10 w-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-sm">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-800">Ask about your metrics</p>
-                  <p className="text-[11px] text-slate-400 max-w-[200px] mx-auto">Query profit margin, product performance, stock ratios, and category revenue.</p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
-                        msg.role === 'user'
-                          ? 'bg-blue-600 text-white rounded-br-sm'
-                          : 'bg-white border border-slate-100 text-slate-750 rounded-bl-sm font-medium'
-                      }`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div className="flex justify-start">
-                      <div className="rounded-2xl bg-white border border-slate-100 px-4 py-2.5 text-slate-400 text-xs shadow-[0_1px_2px_rgba(0,0,0,0.02)] flex gap-1">
-                        <span className="animate-bounce font-bold">●</span>
-                        <span className="animate-bounce font-bold [animation-delay:0.2s]">●</span>
-                        <span className="animate-bounce font-bold [animation-delay:0.4s]">●</span>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Footer Form */}
-            <div className="p-3 border-t border-slate-100 bg-white flex gap-2">
-              <Input
-                placeholder="Ask a question..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
-                disabled={chatLoading}
-                className="rounded-2xl text-xs h-10 border-slate-200 focus-visible:ring-blue-600 bg-slate-50/50"
-              />
-              <button
-                onClick={handleSendChat}
-                disabled={chatLoading || !chatInput.trim()}
-                className="h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-all disabled:opacity-50 shrink-0 shadow-sm"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={() => setChatOpen((v) => !v)}
-          className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg hover:bg-blue-700 transition-all hover:scale-105 active:scale-95 p-3"
-        >
-          <Bot className="h-6 w-6 text-white" />
-        </button>
-      </div>
+      {/* ── Floating AI Chat Companion ── */}
+      <DecisionChatWidget metrics={metrics} />
     </div>
   </div>
   );

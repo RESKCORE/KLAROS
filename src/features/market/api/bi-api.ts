@@ -5,6 +5,8 @@ import Papa from 'papaparse';
 import type { Decision } from '@/features/decisions/types/decision';
 import type { McdaRawResponse } from '@/features/decisions/core/analysis-schema';
 
+import { readCache, writeCache } from '@/lib/cache';
+
 const DATA_SOURCES_CACHE_KEY = 'klaros:data-sources:v3';
 
 export type DataSourceSummary = {
@@ -21,23 +23,6 @@ export type DataSourceSummary = {
     investments: number;
   } | null;
 };
-
-function readCache<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
 
 export function getCachedDataSources(): DataSourceSummary[] | null {
   return readCache<DataSourceSummary[]>(DATA_SOURCES_CACHE_KEY);

@@ -110,36 +110,12 @@ async function buildHistoryInWorker(
 
 // ─── localStorage Cache ───────────────────────────────────────────────────────
 
+import { readCache, writeCache } from '@/lib/cache';
+
 const METRICS_CACHE_VERSION = 'v2'; // bump when MarketMetrics shape changes
 const METRICS_CACHE_KEY = `klaros:market-metrics:${METRICS_CACHE_VERSION}:`;
 const HISTORY_CACHE_KEY = `klaros:market-history:${METRICS_CACHE_VERSION}:`;
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-
-function readCache<T>(key: string): T | null {
-  if (typeof window === 'undefined' || !window.localStorage) return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { timestamp: number; value: T };
-    if (!parsed?.timestamp) return null;
-    if (Date.now() - parsed.timestamp > CACHE_TTL_MS) {
-      window.localStorage.removeItem(key);
-      return null;
-    }
-    return parsed.value;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache<T>(key: string, value: T): void {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), value }));
-  } catch {
-    // Ignore quota errors (private mode, storage full, etc.)
-  }
-}
 
 // ─── CSV Parsing ──────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 import type { Decision, DecisionStatus } from '@/features/decisions/types/decision';
-import { supabase, getSupabaseClient } from '@/services/supabase/supabase';
+import { getSupabaseClient } from '@/services/supabase/supabase';
+import { readCache, writeCache } from '@/lib/cache';
 
 const DECISIONS_CACHE_PREFIX = 'klaros:decisions:v3:';
 
@@ -37,48 +38,13 @@ function mapRowToDecision(row: DecisionRow): Decision {
   };
 }
 
-function readCache<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
-
-type DecisionFilters = {
-  status?: DecisionStatus[];
-  search?: string;
-};
-
-function normalizeSearch(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-export async function getUserDecisions(
-  userId: string,
-  filters?: DecisionFilters,
-): Promise<Decision[]> {
+export async function getUserDecisions(userId: string): Promise<Decision[]> {
   const client = await getSupabaseClient();
-  let query = client
+  const { data, error } = await client
     .from('decisions')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-
-  if (filters?.status?.length) {
-    query = query.in('status', filters.status);
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     console.error('Failed to load decisions from Supabase:', error);
@@ -87,17 +53,8 @@ export async function getUserDecisions(
     throw error;
   }
 
-  let decisions = (data as DecisionRow[]).map(mapRowToDecision);
-
-  if (filters?.search) {
-    const q = normalizeSearch(filters.search);
-    decisions = decisions.filter((d) => d.title.toLowerCase().includes(q));
-  }
-
-  if (!filters?.status?.length && !filters?.search) {
-    writeCache(`${DECISIONS_CACHE_PREFIX}${userId}`, decisions);
-  }
-
+  const decisions = (data as DecisionRow[]).map(mapRowToDecision);
+  writeCache(`${DECISIONS_CACHE_PREFIX}${userId}`, decisions);
   return decisions;
 }
 

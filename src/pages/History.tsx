@@ -31,10 +31,17 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteDecision, getUserDecisions } from '@/features/decisions/store/decision-store';
 import { getCachedDataSources, getDataSources, getMarketMetricsForSource } from '@/features/market/api/bi-api';
 import { getCachedMarketHistory, loadMarketHistory } from '@/features/market/utils/market-metrics';
+import { HistoryDecisionCard } from '@/features/history/components/HistoryDecisionCard';
 import type { Decision } from '@/features/decisions/types/decision';
 import type { MarketHistory } from '@/features/market/utils/market-metrics';
 import type { MarketMetrics } from '@/features/market/utils/market-metrics';
 import type { DataSourceSummary } from '@/features/market/api/bi-api';
+
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0,
+});
 
 export default function History() {
   const { toast } = useToast();
@@ -58,12 +65,6 @@ export default function History() {
   const [historyMetrics, setHistoryMetrics] = useState<MarketHistory | null>(cachedHistory);
   const [historyLoading, setHistoryLoading] = useState(!cachedHistory);
   const [historyError, setHistoryError] = useState<string | null>(null);
-
-  const currencyFormatter = new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  });
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -557,70 +558,19 @@ export default function History() {
                               <Badge variant="outline">Dataset</Badge>
                             </div>
                             <div className="mt-4 space-y-3">
-                              {items.map((decision) => {
-                                const metrics = getKpiSummary(decision);
-                                return (
-                                  <div key={decision.id} className="rounded-xl border bg-muted/20 p-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-4">
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          {compareEnabled ? (
-                                            <input
-                                              type="checkbox"
-                                              checked={compareIds.includes(decision.id)}
-                                              onChange={() => toggleCompare(decision.id)}
-                                              className="h-4 w-4 rounded border-border/60"
-                                            />
-                                          ) : null}
-                                          <p className="font-semibold truncate">{getDecisionLabel(decision)}</p>
-                                          <Badge variant="secondary" className="capitalize">
-                                            {decision.status}
-                                          </Badge>
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                          <Calendar className="h-3.5 w-3.5" />
-                                          <span>Updated {new Date(decision.updated_at).toLocaleDateString()}</span>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <Button size="sm" variant="outline">
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Remove analysis?</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                This will permanently delete this analysis and its results.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                              <AlertDialogAction
-                                                onClick={() => handleDelete(decision.id)}
-                                                disabled={isDeleting === decision.id}
-                                              >
-                                                {isDeleting === decision.id ? 'Removing...' : 'Remove'}
-                                              </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                        <Button size="sm" asChild>
-                                          <Link to={`/decisions/${decision.id}/result`}>View Results</Link>
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                                      <div>Margin: {metrics ? `${metrics.marginPct}%` : '-'}</div>
-                                      <div>Low stock: {metrics ? metrics.lowStock : '-'}</div>
-                                      <div>Top category: {metrics?.topCategory ?? '-'}</div>
-                                      <div>Top product: {metrics?.topProduct ?? '-'}</div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                              {items.map((decision) => (
+                                <HistoryDecisionCard
+                                  key={decision.id}
+                                  decision={decision}
+                                  title={getDecisionLabel(decision)}
+                                  metrics={getKpiSummary(decision)}
+                                  compareEnabled={compareEnabled}
+                                  isCompared={compareIds.includes(decision.id)}
+                                  onToggleCompare={toggleCompare}
+                                  onDelete={handleDelete}
+                                  isDeleting={isDeleting === decision.id}
+                                />
+                              ))}
                             </div>
                           </div>
                         );
@@ -630,41 +580,18 @@ export default function History() {
 
                   {viewMode === 'feed' ? (
                     <section className="space-y-3">
-                      {orderedDecisions.map((decision) => {
-                        const metrics = getKpiSummary(decision);
-                        return (
-                          <div key={decision.id} className="rounded-xl border bg-card/70 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                {compareEnabled ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={compareIds.includes(decision.id)}
-                                    onChange={() => toggleCompare(decision.id)}
-                                    className="h-4 w-4 rounded border-border/60"
-                                  />
-                                ) : null}
-                                <p className="font-semibold">{getDecisionLabel(decision)}</p>
-                                <Badge variant="secondary" className="capitalize">
-                                  {decision.status}
-                                </Badge>
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Updated {formatDistanceToNow(new Date(decision.updated_at), { addSuffix: true })}
-                              </div>
-                              <div className="mt-2 text-xs text-muted-foreground">
-                                Margin {metrics ? `${metrics.marginPct}%` : '-'} · Low stock {metrics ? metrics.lowStock : '-'} ·
-                                Top category {metrics?.topCategory ?? '-'} · Top product {metrics?.topProduct ?? '-'}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" asChild>
-                                <Link to={`/decisions/${decision.id}/result`}>View Results</Link>
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {orderedDecisions.map((decision) => (
+                        <HistoryDecisionCard
+                          key={decision.id}
+                          decision={decision}
+                          title={getDecisionLabel(decision)}
+                          metrics={getKpiSummary(decision)}
+                          compareEnabled={compareEnabled}
+                          isCompared={compareIds.includes(decision.id)}
+                          onToggleCompare={toggleCompare}
+                          compact
+                        />
+                      ))}
                     </section>
                   ) : null}
 

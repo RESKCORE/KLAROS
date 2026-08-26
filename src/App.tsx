@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ClerkProvider, SignIn, SignUp } from "@clerk/react";
 import { AuthProvider } from "@/features/auth/contexts/ClerkAuthContext";
@@ -14,8 +13,6 @@ import DecisionResult from "./pages/DecisionResult";
 import History from "./pages/History";
 import ConnectData from "./pages/ConnectData";
 import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
 
 const CLERK_PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ??
@@ -65,108 +62,106 @@ const App = () => {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        {!CLERK_PUBLISHABLE_KEY ? (
-          <MissingConfigScreen />
-        ) : (
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <ClerkProvider
-              publishableKey={CLERK_PUBLISHABLE_KEY}
-              signInUrl="/login"
-              signUpUrl="/signup"
-              signInFallbackRedirectUrl="/dashboard"
-              signUpFallbackRedirectUrl="/dashboard"
-            >
-              <AuthProvider>
-                <Routes>
-                  {/* Public routes */}
-                  <Route path="/" element={<Index />} />
-                  <Route
-                    path="/login/*"
-                    element={
-                      <div className="min-h-screen flex items-center justify-center bg-background">
-                        <SignIn
-                          routing="path"
-                          path="/login"
-                          signUpUrl="/signup"
-                          fallbackRedirectUrl="/dashboard"
-                        />
-                      </div>
-                    }
-                  />
-                  <Route
-                    path="/signup/*"
-                    element={
-                      <div className="min-h-screen flex items-center justify-center bg-background">
-                        <SignUp
-                          routing="path"
-                          path="/signup"
-                          signInUrl="/login"
-                          fallbackRedirectUrl="/dashboard"
-                        />
-                      </div>
-                    }
-                  />
-                  <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      {!CLERK_PUBLISHABLE_KEY ? (
+        <MissingConfigScreen />
+      ) : (
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <ClerkProvider
+            publishableKey={CLERK_PUBLISHABLE_KEY}
+            signInUrl="/login"
+            signUpUrl="/signup"
+            signInFallbackRedirectUrl="/dashboard"
+            signUpFallbackRedirectUrl="/dashboard"
+          >
+            <AuthProvider>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route
+                  path="/login/*"
+                  element={
+                    <div className="min-h-screen flex items-center justify-center bg-background">
+                      <SignIn
+                        routing="path"
+                        path="/login"
+                        signUpUrl="/signup"
+                        fallbackRedirectUrl="/dashboard"
+                      />
+                    </div>
+                  }
+                />
+                <Route
+                  path="/signup/*"
+                  element={
+                    <div className="min-h-screen flex items-center justify-center bg-background">
+                      <SignUp
+                        routing="path"
+                        path="/signup"
+                        signInUrl="/login"
+                        fallbackRedirectUrl="/dashboard"
+                      />
+                    </div>
+                  }
+                />
+                <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
-                  {/* Protected routes */}
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <Dashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/decisions/new"
-                    element={
-                      <Navigate to="/connect-data" replace />
-                    }
-                  />
-                  <Route
-                    path="/decisions/:id"
-                    element={
-                      <Navigate to="/dashboard" replace />
-                    }
-                  />
-                  <Route
-                    path="/decisions/:id/result"
-                    element={
-                      <ProtectedRoute>
-                        <DecisionResult />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/history"
-                    element={
-                      <ProtectedRoute>
-                        <History />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/connect-data"
-                    element={
-                      <ProtectedRoute>
-                        <ConnectData />
-                      </ProtectedRoute>
-                    }
-                  />
+                {/* Protected routes */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/decisions/new"
+                  element={
+                    <Navigate to="/connect-data" replace />
+                  }
+                />
+                <Route
+                  path="/decisions/:id"
+                  element={
+                    <Navigate to="/dashboard" replace />
+                  }
+                />
+                <Route
+                  path="/decisions/:id/result"
+                  element={
+                    <ProtectedRoute>
+                      <DecisionResult />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <ProtectedRoute>
+                      <History />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/connect-data"
+                  element={
+                    <ProtectedRoute>
+                      <ConnectData />
+                    </ProtectedRoute>
+                  }
+                />
 
-                  {/* Catch-all route */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AuthProvider>
-            </ClerkProvider>
-          </BrowserRouter>
-        )}
-      </TooltipProvider>
-    </QueryClientProvider>
+                {/* Catch-all route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
+          </ClerkProvider>
+        </BrowserRouter>
+      )}
+    </TooltipProvider>
   );
 };
 
