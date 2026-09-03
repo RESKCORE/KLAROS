@@ -62,36 +62,48 @@ export function parseSaatyNumber(val: unknown): number {
 }
 
 /**
- * Normalizes a pairwise comparison representation into a clean [A vs B, A vs C, B vs C] triple.
+ * Normalizes a pairwise comparison representation into a clean flat array or matrix.
  * Handles:
- *  - Flat array [a, b, c]
- *  - Full 3x3 reciprocal matrix [[1, a, b], [1/a, 1, c], [1/b, 1/c, 1]]
- *  - Objects or non-standard shapes with safe default [1, 1, 1]
+ *  - Flat array [a, b, c, ...]
+ *  - Full K×K reciprocal matrix [[1, a, b], [1/a, 1, c], [1/b, 1/c, 1]]
+ *  - Objects or non-standard shapes with safe default
  */
-export function normalizeComparisonTriple(val: unknown): [number, number, number] {
-  // If it's a 3x3 matrix: [[1, a, b], [1/a, 1, c], [1/b, 1/c, 1]]
-  if (Array.isArray(val) && val.length >= 2 && Array.isArray(val[0])) {
-    const row0 = val[0] as unknown[];
-    const row1 = val[1] as unknown[];
-    const a = parseSaatyNumber(row0?.[1] ?? 1);
-    const b = parseSaatyNumber(row0?.[2] ?? 1);
-    const c = parseSaatyNumber(row1?.[2] ?? 1);
-    return [a, b, c];
-  }
-  // If it's a flat array of comparisons
+export function normalizeComparisonList(val: unknown, expectedLength = 3): number[] {
   if (Array.isArray(val)) {
-    const a = parseSaatyNumber(val[0] ?? 1);
-    const b = parseSaatyNumber(val[1] ?? 1);
-    const c = parseSaatyNumber(val[2] ?? 1);
-    return [a, b, c];
+    // If it's a 2D matrix, extract upper triangle
+    if (val.length >= 2 && Array.isArray(val[0])) {
+      const n = val.length;
+      const upper: number[] = [];
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          upper.push(parseSaatyNumber((val[i] as unknown[])?.[j] ?? 1));
+        }
+      }
+      return upper;
+    }
+    // Flat array
+    const parsed = val.map((item) => parseSaatyNumber(item));
+    return parsed.length > 0 ? parsed : Array(expectedLength).fill(1);
   }
-  return [1, 1, 1];
+  return Array(expectedLength).fill(1);
 }
 
 /**
- * A triple of Saaty values representing the three pairwise comparisons
- * needed for a 3×3 AHP matrix: [A vs B, A vs C, B vs C].
+ * Legacy helper for 3x3 triples [A vs B, A vs C, B vs C].
  */
+export function normalizeComparisonTriple(val: unknown): [number, number, number] {
+  const list = normalizeComparisonList(val, 3);
+  return [list[0] ?? 1, list[1] ?? 1, list[2] ?? 1];
+}
+
+/**
+ * Saaty values representing the pairwise comparisons needed for an AHP matrix.
+ */
+export const DynamicComparisonSchema = z.preprocess(
+  (val) => normalizeComparisonList(val),
+  z.array(z.number()),
+);
+
 export const ComparisonTripleSchema = z.preprocess(
   (val) => normalizeComparisonTriple(val),
   z.tuple([z.number(), z.number(), z.number()]),
@@ -100,25 +112,18 @@ export const ComparisonTripleSchema = z.preprocess(
 export const OptionComparisonsSchema = z.preprocess(
   (val) => {
     if (Array.isArray(val)) {
-      const list = val.slice(0, 3).map((item) => normalizeComparisonTriple(item));
-      while (list.length < 3) {
-        list.push([1, 1, 1]);
-      }
-      return [list[0], list[1], list[2]];
+      return val.map((item) => normalizeComparisonList(item));
     }
     return [[1, 1, 1], [1, 1, 1], [1, 1, 1]];
   },
-  z.tuple([
-    z.tuple([z.number(), z.number(), z.number()]),
-    z.tuple([z.number(), z.number(), z.number()]),
-    z.tuple([z.number(), z.number(), z.number()]),
-  ]),
+  z.array(z.array(z.number())),
 );
 
 // ─── MCDA Raw Response Schema ─────────────────────────────────────────────────
 
 /**
  * Schema for the raw LLM MCDA response before AHP post-processing.
+ * Supports dynamic N options (2–10) and M criteria (2–10).
  */
 export const McdaRawResponseSchema = z.object({
   // ── Display-only fields (soft failure is acceptable) ──────────────────────
@@ -128,19 +133,14 @@ export const McdaRawResponseSchema = z.object({
 
   // ── AHP-critical fields (strict validation) ───────────────────────────────
 
-  /** Exactly 3 strategic options. */
+  /** Strategic options (2 to 10 options supported). */
   options: z.preprocess((val) => {
-    if (Array.isArray(val)) {
-      const list = val.map((o, idx) => ({
+    if (Array.isArray(val) && val.length >= 2) {
+      return val.slice(0, 10).map((o, idx) => ({
         id: (o && typeof o === 'object' && 'id' in o && typeof o.id === 'string' && o.id.trim()) || `o${idx + 1}`,
         label: (o && typeof o === 'object' && 'label' in o && typeof o.label === 'string' && o.label.trim()) || `Option ${idx + 1}`,
         description: (o && typeof o === 'object' && 'description' in o && typeof o.description === 'string') ? o.description : '',
-      })).slice(0, 3);
-      while (list.length < 3) {
-        const idx = list.length + 1;
-        list.push({ id: `o${idx}`, label: `Option ${idx}`, description: '' });
-      }
-      return list;
+      }));
     }
     return [
       { id: 'o1', label: 'Option 1', description: '' },
@@ -151,21 +151,16 @@ export const McdaRawResponseSchema = z.object({
     id: z.string().min(1),
     label: z.string().min(1),
     description: z.string().optional().catch(''),
-  })).min(3).max(3)),
+  })).min(2).max(10)),
 
-  /** Exactly 3 evaluation criteria. */
+  /** Evaluation criteria (2 to 10 criteria supported). */
   criteria: z.preprocess((val) => {
-    if (Array.isArray(val)) {
-      const list = val.map((c, idx) => ({
+    if (Array.isArray(val) && val.length >= 2) {
+      return val.slice(0, 10).map((c, idx) => ({
         id: (c && typeof c === 'object' && 'id' in c && typeof c.id === 'string' && c.id.trim()) || `c${idx + 1}`,
         name: (c && typeof c === 'object' && 'name' in c && typeof c.name === 'string' && c.name.trim()) || `Criterion ${idx + 1}`,
         weight: typeof c === 'object' && c && 'weight' in c && typeof c.weight === 'number' ? c.weight : undefined,
-      })).slice(0, 3);
-      while (list.length < 3) {
-        const idx = list.length + 1;
-        list.push({ id: `c${idx}`, name: `Criterion ${idx}`, weight: undefined });
-      }
-      return list;
+      }));
     }
     return [
       { id: 'c1', name: 'Criterion 1', weight: undefined },
@@ -176,14 +171,14 @@ export const McdaRawResponseSchema = z.object({
     id: z.string().min(1),
     name: z.string().min(1),
     weight: z.number().optional(),
-  })).min(3).max(3)),
+  })).min(2).max(10)),
 
-  /** [C1vsC2, C1vsC3, C2vsC3] using Saaty 1–9 scale. */
-  criteriaComparisons: ComparisonTripleSchema,
+  /** Criteria pairwise comparisons on Saaty 1–9 scale. */
+  criteriaComparisons: DynamicComparisonSchema,
 
   /**
-   * One ComparisonTriple per criterion, each comparing options pairwise:
-   * [[O1vsO2, O1vsO3, O2vsO3], [...], [...]].
+   * Option pairwise comparisons per criterion:
+   * Array of length M (one per criterion), each containing option comparisons.
    */
   optionComparisons: OptionComparisonsSchema,
 

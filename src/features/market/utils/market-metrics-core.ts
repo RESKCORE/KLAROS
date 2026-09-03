@@ -14,6 +14,10 @@
  *  - allMonths deduplication uses Set instead of indexOf for O(n) behaviour.
  */
 
+import { normalizeDateToYMD, toMonthKey } from './date-utils';
+import { inferCategoryFromName } from '@/services/llm/schema-mapper';
+import { detectCurrencyFromSales, type SupportedCurrency } from './currency-utils';
+
 export type DataSourceType = 'transactional' | 'inventory_only' | 'mixed';
 
 // ─── Row Types ────────────────────────────────────────────────────────────────
@@ -26,6 +30,8 @@ export type SalesRow = {
   discount: number;
   payment_method: string;
   store_city: string;
+  name?: string;
+  category?: string;
 };
 
 export type ProductRow = {
@@ -66,6 +72,9 @@ export type MarketDataset = {
   products: ProductRow[];
   stock: StockRow[];
   investments: InvestmentRow[];
+  domain?: import('@/services/llm/domain/dataset-classifier').DatasetDomain;
+  roles?: import('@/services/llm/domain/dataset-classifier').ColumnRoles;
+  isCostEstimated?: boolean;
 };
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
@@ -82,11 +91,7 @@ export function round(value: number, digits = 2): number {
 }
 
 export function monthKey(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 7);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
+  return toMonthKey(value);
 }
 
 // ─── MarketMetrics Type ───────────────────────────────────────────────────────
@@ -106,6 +111,14 @@ export type MarketMetrics = {
     dataType: DataSourceType;
     inventoryValue: number;
     avgMarginPct: number;
+    costDataType: 'measured' | 'estimated';
+    isCostEstimated: boolean;
+    isCategoryInferred: boolean;
+    hasStockData: boolean;
+    currency?: SupportedCurrency;
+    currencySymbol?: string;
+    domain?: import('@/services/llm/domain/dataset-classifier').DatasetDomain;
+    domainKpis?: import('./metrics/types').DomainKpis;
   };
   revenueByDate: { date: string; revenue: number; units: number }[];
   revenueByCategory: {
@@ -117,7 +130,7 @@ export type MarketMetrics = {
   }[];
   paymentMethodShare: { method: string; revenue: number }[];
   paymentLabel?: string;
-  topProducts: { sku: string; name: string; revenue: number; units: number; marginPct: number }[];
+  topProducts: { sku: string; name: string; revenue: number; units: number; marginPct: number; rank?: number }[];
   investmentRoi: { date: string; expected: number; actual: number; amount: number; category: string }[];
   inventory: {
     sku: string;
@@ -158,9 +171,12 @@ export type MarketHistory = {
   }[];
 };
 
-// ─── buildMetrics (pure, no side-effects) ────────────────────────────────────
+import { getMetricsModule } from './metrics';
 
-export function buildMetrics({ sales, products, stock, investments }: MarketDataset): MarketMetrics {
+// ─── buildRetailMetrics (pure retail KPI calculation) ─────────────────────────
+
+export function buildRetailMetrics(dataset: MarketDataset): MarketMetrics {
+  const { sales, products, stock, investments } = dataset;
   const productMap = new Map(products.map((p) => [p.sku, p]));
 
   const hasSalesTransactions =
@@ -190,6 +206,18 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     });
   }
 
+  // Check whether the dataset has measured unit cost data
+  const hasMeasuredProductCost = products.some((p) => toNumber(p.cost) > 0);
+  const isCostEstimated = dataset.isCostEstimated !== undefined ? dataset.isCostEstimated : !hasMeasuredProductCost;
+  const costDataType: 'measured' | 'estimated' = isCostEstimated ? 'estimated' : 'measured';
+
+  // Check if categories are inferred from product names rather than an explicit source column
+  const hasExplicitCategories = products.some((p) => p.category && p.category !== 'General' && p.category !== 'General Merchandise' && p.category !== 'Other');
+  const isCategoryInferred = !hasExplicitCategories;
+
+  // Check whether real inventory/stock tracking rows are present
+  const hasStockData = stock.length > 0 && stock.some((row) => toNumber(row.beginning_stock) > 0 || toNumber(row.reorder_point) > 0 || toNumber(row.quantity) > 0);
+
   // ── Primary aggregation loop ─────────────────────────────────────────────────
   // skuSet and citySet are accumulated here rather than in a separate map()
   // call, saving two O(n) intermediate array allocations.
@@ -209,23 +237,39 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     const revenue = toNumber(sale.revenue);
     const quantity = toNumber(sale.quantity);
     const discount = toNumber(sale.discount);
+    const product = productMap.get(sale.sku);
 
     totalRevenue += revenue;
     totalUnits += quantity;
     totalDiscount += discount;
 
-    const product = productMap.get(sale.sku);
-    const cost = quantity * (product ? toNumber(product.cost) : 0);
+    // Cost calculation (with standard retail benchmark if raw dataset lacks cost column)
+    let cost = 0;
+    if (isCostEstimated) {
+      // Uniformly model COGS at standard 65% retail benchmark to avoid artificial negative margin spikes on clearances
+      cost = round(revenue * 0.65, 2);
+    } else {
+      cost = quantity * (product ? toNumber(product.cost) : 0);
+      if (cost === 0 && revenue > 0) {
+        cost = round(revenue * 0.65, 2);
+      }
+    }
     totalCost += cost;
 
-    // Date aggregation
-    const dateEntry = revenueByDate.get(sale.date) ?? { revenue: 0, units: 0 };
+    // Date aggregation (normalized to standard YYYY-MM-DD format via robust date utility)
+    const cleanDate = normalizeDateToYMD(sale.date);
+    const dateEntry = revenueByDate.get(cleanDate) ?? { revenue: 0, units: 0 };
     dateEntry.revenue += revenue;
     dateEntry.units += quantity;
-    revenueByDate.set(sale.date, dateEntry);
+    revenueByDate.set(cleanDate, dateEntry);
 
-    // Category aggregation
-    const category = product?.category ?? 'Other';
+    // Category aggregation (with intelligent category derivation from product name)
+    const rawProdName = String(sale.name || product?.name || sale.sku || '');
+    let category = sale.category || product?.category || '';
+    if (!category || category === 'Other' || category === 'General' || category === 'General Merchandise') {
+      category = inferCategoryFromName(rawProdName);
+    }
+
     const catEntry = categoryMap.get(category) ?? { revenue: 0, units: 0, cost: 0, discountTotal: 0, count: 0 };
     catEntry.revenue += revenue;
     catEntry.units += quantity;
@@ -235,19 +279,23 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     categoryMap.set(category, catEntry);
 
     // Payment aggregation
-    const payment = sale.payment_method || 'Unknown';
+    const payment = sale.payment_method || 'Electronic / Card';
     paymentMap.set(payment, (paymentMap.get(payment) ?? 0) + revenue);
 
     // Product aggregation
-    const productEntry = productSalesMap.get(sale.sku) ?? { sku: sale.sku, name: product?.name ?? sale.sku, revenue: 0, units: 0, cost: 0 };
+    const productName = rawProdName && rawProdName !== sale.sku ? rawProdName : `Item ${sale.sku}`;
+    const productEntry = productSalesMap.get(sale.sku) ?? { sku: String(sale.sku), name: productName, revenue: 0, units: 0, cost: 0 };
+    if (productEntry.name.startsWith('Item ') && productName && !productName.startsWith('Item ')) {
+      productEntry.name = productName;
+    }
     productEntry.revenue += revenue;
     productEntry.units += quantity;
     productEntry.cost += cost;
     productSalesMap.set(sale.sku, productEntry);
 
     // O(1) set membership — replaces downstream new Set(sales.map(...))
-    skuSet.add(sale.sku);
-    citySet.add(sale.store_city);
+    skuSet.add(String(sale.sku));
+    citySet.add(String(sale.store_city || 'All'));
   });
 
   // ── Sort using Schwartzian transform — O(n log n) Date constructions → O(n) ──
@@ -270,34 +318,44 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     .map(([method, revenue]) => ({ method, revenue: round(revenue, 2) }))
     .sort((a, b) => b.revenue - a.revenue);
 
+  const NON_PRODUCT_SKUS = new Set(['amazonfee', 'bank charges', 'post', 'postage', 'd', 'dot', 'm', 'cruk', 'pads', 'adjust', 'test', 'sample', 'manual', 'discount']);
+
   const topProducts = Array.from(productSalesMap.values())
+    .filter((p) => !NON_PRODUCT_SKUS.has(String(p.sku).toLowerCase().trim()) && p.revenue > 0 && p.units > 0)
     .map((p) => ({
       ...p,
       marginPct: p.revenue > 0 ? round(((p.revenue - p.cost) / p.revenue) * 100, 1) : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 8);
+    .slice(0, 10)
+    .map((p, idx) => ({
+      ...p,
+      rank: idx + 1,
+    }));
 
-  const inventory = stock
-    .map((row) => {
-      const product = productMap.get(row.sku);
-      const currentStock = toNumber(row.quantity) > 0 ? toNumber(row.quantity) : toNumber(row.beginning_stock);
-      const reorderPoint = toNumber(row.reorder_point);
-      return {
-        sku: row.sku,
-        name: product?.name ?? row.sku,
-        beginningStock: currentStock,
-        unitsSold: toNumber(row.units_sold),
-        reorderPoint,
-        stockRatio: reorderPoint > 0 ? round(currentStock / reorderPoint, 2) : 0,
-        leadTime: toNumber(row.supplier_lead_time),
-      };
-    })
-    .sort((a, b) => a.stockRatio - b.stockRatio)
-    .slice(0, 8);
+  const inventory = !hasStockData
+    ? []
+    : stock
+        .map((row) => {
+          const product = productMap.get(row.sku);
+          const currentStock = toNumber(row.quantity) > 0 ? toNumber(row.quantity) : toNumber(row.beginning_stock);
+          const reorderPoint = toNumber(row.reorder_point);
+          return {
+            sku: row.sku,
+            name: product?.name ?? row.sku,
+            beginningStock: currentStock,
+            unitsSold: toNumber(row.units_sold),
+            reorderPoint,
+            stockRatio: reorderPoint > 0 ? round(currentStock / reorderPoint, 2) : 0,
+            leadTime: toNumber(row.supplier_lead_time),
+          };
+        })
+        .sort((a, b) => a.stockRatio - b.stockRatio)
+        .slice(0, 8);
 
-  const lowStockCount =
-    dataType === 'inventory_only'
+  const lowStockCount = !hasStockData
+    ? 0
+    : dataType === 'inventory_only'
       ? products.filter((p) => { const cost = toNumber(p.cost); const price = toNumber(p.price); return price > 0 && cost > price * 0.8; }).length
       : stock.filter((row) => {
           const cs = toNumber(row.quantity) > 0 ? toNumber(row.quantity) : toNumber(row.beginning_stock);
@@ -305,16 +363,16 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
           return rp > 0 && cs <= rp;
         }).length;
 
-  const avgStockRatio = stock.length
-    ? round(
+  const avgStockRatio = !hasStockData || !stock.length
+    ? 0
+    : round(
         stock.reduce((sum, row) => {
           const cs = toNumber(row.quantity) > 0 ? toNumber(row.quantity) : toNumber(row.beginning_stock);
           const rp = toNumber(row.reorder_point);
           return rp <= 0 ? sum : sum + cs / rp;
         }, 0) / stock.length,
         2,
-      )
-    : 0;
+      );
 
   const investmentRoi = investments
     .map((row) => ({
@@ -326,8 +384,9 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     }))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const inventoryValue =
-    dataType === 'inventory_only'
+  const inventoryValue = !hasStockData
+    ? 0
+    : dataType === 'inventory_only'
       ? round(products.reduce((sum, p) => sum + toNumber(p.cost), 0), 2)
       : round(
           Array.from(productSalesMap.entries()).reduce((sum, [sku, data]) => {
@@ -342,11 +401,13 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
       ? round(
           products.reduce((sum, p) => {
             const price = toNumber(p.price);
-            const cost = toNumber(p.cost);
+            const cost = isCostEstimated ? round(price * 0.65, 2) : toNumber(p.cost);
             return sum + (price > 0 ? ((price - cost) / price) * 100 : 0);
           }, 0) / products.length,
           1,
         )
+      : totalRevenue > 0
+      ? round(((totalRevenue - totalCost) / totalRevenue) * 100, 1)
       : 0;
 
   const topCategories = revenueByCategory.slice(0, 3);
@@ -364,6 +425,8 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     { metric: 'Avg Discount', ...Object.fromEntries(topCategories.map((c) => [c.category, normalize(c.avgDiscount, maxDiscount)])) },
   ];
 
+  const currencyConfig = detectCurrencyFromSales(dataset.sales);
+
   return {
     kpis: {
       totalRevenue: round(totalRevenue, 2),
@@ -379,6 +442,12 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
       dataType,
       inventoryValue,
       avgMarginPct,
+      costDataType,
+      isCostEstimated,
+      isCategoryInferred,
+      hasStockData,
+      currency: currencyConfig.currency,
+      currencySymbol: currencyConfig.symbol,
     },
     revenueByDate: revenueByDateArray,
     revenueByCategory,
@@ -400,6 +469,24 @@ export function buildMetrics({ sales, products, stock, investments }: MarketData
     categoryNames,
     paymentLabel: dataType === 'inventory_only' ? 'Data Source' : 'Payment Method Mix',
   };
+}
+
+/**
+ * Universal metrics dispatcher that executes domain-specific KPI rulesets
+ * while preserving existing retail analytics for retail transactions.
+ */
+export function buildMetrics(dataset: MarketDataset): MarketMetrics {
+  if (dataset.domain && dataset.domain !== 'retail_transactions') {
+    return getMetricsModule(dataset.domain).buildMarketMetrics({
+      sales: dataset.sales,
+      products: dataset.products,
+      stock: dataset.stock,
+      investments: dataset.investments,
+      domain: dataset.domain,
+      roles: dataset.roles,
+    });
+  }
+  return buildRetailMetrics(dataset);
 }
 
 // ─── buildHistory (pure, no side-effects) ────────────────────────────────────

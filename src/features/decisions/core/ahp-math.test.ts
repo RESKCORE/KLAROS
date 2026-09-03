@@ -130,4 +130,35 @@ describe('ahpSynthesis', () => {
     const totalSum = result.totalScores.reduce((a, b) => a + b, 0);
     expect(totalSum).toBeCloseTo(1, 4);
   });
+
+  it('performs dynamic 4-option × 2-criteria synthesis correctly', () => {
+    // 2 criteria -> 1 pairwise comparison [c01 = 3]
+    // 4 options -> 6 pairwise comparisons per criterion: [a01, a02, a03, a12, a13, a23]
+    const result = ahpSynthesis({
+      criteriaComparisons: [3],
+      optionComparisons: [
+        [2, 3, 4, 2, 3, 2], // Criterion 1 comparisons for 4 options
+        [1, 2, 3, 2, 3, 2], // Criterion 2 comparisons for 4 options
+      ],
+      criteriaCount: 2,
+      optionsCount: 4,
+    });
+
+    expect(result.weights).toHaveLength(2);
+    expect(result.weights[0]).toBeCloseTo(0.75, 2);
+    expect(result.weights[1]).toBeCloseTo(0.25, 2);
+
+    expect(result.optionVectors).toHaveLength(2);
+    expect(result.optionVectors[0]).toHaveLength(4);
+    expect(result.optionVectors[1]).toHaveLength(4);
+
+    expect(result.totalScores).toHaveLength(4);
+    const scoreSum = result.totalScores.reduce((a, b) => a + b, 0);
+    expect(scoreSum).toBeCloseTo(1, 4);
+
+    // Verify 4-element ranking array
+    expect(result.ranking).toHaveLength(4);
+    expect([...result.ranking].sort()).toEqual([1, 2, 3, 4]);
+  });
 });
+

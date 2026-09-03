@@ -1,4 +1,13 @@
 import { getCachedMarketMetrics, loadMarketMetrics } from '@/features/market/utils/market-metrics';
+import {
+  buildMetrics,
+  buildHistory,
+  type MarketDataset,
+  type SalesRow,
+  type ProductRow,
+  type StockRow,
+  type InvestmentRow,
+} from '@/features/market/utils/market-metrics-core';
 import { supabase, getSupabaseClient } from '@/services/supabase/supabase';
 import { generateMcdaAnalysis } from '@/services/llm/llm-service';
 import Papa from 'papaparse';
@@ -34,7 +43,7 @@ export async function getDataSources(userId?: string): Promise<DataSourceSummary
   const client = await getSupabaseClient();
   const { data, error } = await client
     .from('data_sources')
-    .select('*')
+    .select('id, user_id, name, type, status, last_synced_at, is_synthetic, counts, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -51,15 +60,24 @@ export async function getDataSources(userId?: string): Promise<DataSourceSummary
     return [];
   }
 
-  const mapped: DataSourceSummary[] = data.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    name: row.name as string,
-    type: row.type as string,
-    status: row.status as string,
-    lastSyncedAt: (row.last_synced_at as string) || null,
-    isSynthetic: !!row.is_synthetic,
-    counts: row.counts ? (row.counts as DataSourceSummary['counts']) : null,
-  }));
+  const mapped: DataSourceSummary[] = data.map((row: Record<string, unknown>) => {
+    let cleanCounts = row.counts ? { ...(row.counts as Record<string, unknown>) } : null;
+    if (cleanCounts) {
+      // Strip heavy data objects before caching in the summary list to prevent localStorage quota exhaustion
+      const { _data: _, precomputed_metrics: _pm, precomputed_history: _ph, ...rest } = cleanCounts;
+      cleanCounts = rest;
+    }
+
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      type: row.type as string,
+      status: row.status as string,
+      lastSyncedAt: (row.last_synced_at as string) || null,
+      isSynthetic: !!row.is_synthetic,
+      counts: cleanCounts as DataSourceSummary['counts'],
+    };
+  });
 
   writeCache(DATA_SOURCES_CACHE_KEY, mapped);
   return mapped;
@@ -221,18 +239,59 @@ export async function uploadNormalizedDataset(
     products: Record<string, unknown>[];
     stock: Record<string, unknown>[];
     investments: Record<string, unknown>[];
+    domain?: import('@/services/llm/domain/dataset-classifier').DatasetDomain;
+    roles?: import('@/services/llm/domain/dataset-classifier').ColumnRoles;
+    isCostEstimated?: boolean;
   },
 ): Promise<{ ok: boolean; dataSourceId: string }> {
   try {
     console.log(`📤 Uploading normalized AI dataset to Supabase...`);
     const client = await getSupabaseClient();
 
+    // 1. Precompute EXACT full-dataset KPIs across 100% of raw rows (before any sampling)
+    console.log(`📊 Precomputing exact KPIs across all ${normalizedData.sales.length} records (Domain: ${normalizedData.domain || 'retail_transactions'})...`);
+    const fullDataset: MarketDataset = {
+      sales: normalizedData.sales as unknown as SalesRow[],
+      products: normalizedData.products as unknown as ProductRow[],
+      stock: normalizedData.stock as unknown as StockRow[],
+      investments: normalizedData.investments as unknown as InvestmentRow[],
+      domain: normalizedData.domain,
+      roles: normalizedData.roles,
+      isCostEstimated: normalizedData.isCostEstimated,
+    };
+    const precomputedMetrics = buildMetrics(fullDataset);
+    const precomputedHistory = buildHistory(fullDataset, 12);
+
+    // If sales array is massive (> 25,000 rows), sample representative records to stay within PostgREST payload limits
+    const MAX_STORED_ROWS = 25000;
+    let uploadSales = normalizedData.sales;
+    if (uploadSales.length > MAX_STORED_ROWS) {
+      const step = Math.ceil(uploadSales.length / MAX_STORED_ROWS);
+      uploadSales = uploadSales.filter((_, idx) => idx % step === 0).slice(0, MAX_STORED_ROWS);
+      console.log(`⚡ Sampled ${normalizedData.sales.length} raw transactions down to ${uploadSales.length} representative rows for high-performance processing`);
+    }
+
+    let uploadProducts = normalizedData.products;
+    if (uploadProducts.length > 10000) {
+      uploadProducts = uploadProducts.slice(0, 10000);
+    }
+
+    const payloadData = {
+      sales: uploadSales,
+      products: uploadProducts,
+      stock: normalizedData.stock.slice(0, 10000),
+      investments: normalizedData.investments.slice(0, 5000),
+    };
+
     const counts = {
       products: normalizedData.products.length,
       salesHistory: normalizedData.sales.length,
       stockMovements: normalizedData.stock.length,
       investments: normalizedData.investments.length,
-      _data: normalizedData,
+      detected_domain: normalizedData.domain || 'retail_transactions',
+      precomputed_metrics: precomputedMetrics,
+      precomputed_history: precomputedHistory,
+      _data: payloadData,
     };
 
     const { data, error } = await client
@@ -244,7 +303,7 @@ export async function uploadNormalizedDataset(
         status: 'connected',
         last_synced_at: new Date().toISOString(),
         counts,
-        csv_data: normalizedData,
+        csv_data: payloadData,
       })
       .select('id')
       .single();
@@ -266,10 +325,14 @@ export async function uploadNormalizedDataset(
 
       if (error2) throw new Error(`Supabase error: ${JSON.stringify(error2)}`);
       writeCache(DATA_SOURCES_CACHE_KEY, null);
+      writeCache(`klaros:market-metrics:v2:${data2.id}`, precomputedMetrics);
+      writeCache(`klaros:market-history:v2:${data2.id}:12`, precomputedHistory);
       return { ok: true, dataSourceId: data2.id };
     }
 
     writeCache(DATA_SOURCES_CACHE_KEY, null);
+    writeCache(`klaros:market-metrics:v2:${data.id}`, precomputedMetrics);
+    writeCache(`klaros:market-history:v2:${data.id}:12`, precomputedHistory);
     return { ok: true, dataSourceId: data.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

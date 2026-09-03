@@ -11,6 +11,7 @@
 import { callLLMProxy } from '@/services/llm/core/llm-proxy-client';
 import { extractJSON } from '@/services/llm/core/json-extractor';
 import type { MarketMetrics } from '@/features/market/utils/market-metrics';
+import { getCurrencyPromptGuideline } from '@/features/market/utils/currency-utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,49 +77,203 @@ Provide the summary in plain text with clear bullet points using ₹ for all amo
  */
 export async function generateAiInsightsFromMetrics(metrics: MarketMetrics): Promise<AiStructuredInsight> {
   const payload = buildMetricsSummary(metrics);
+  const domain = metrics.kpis.domain || 'retail_transactions';
 
-  const prompt = `You are a senior retail BI analyst for an Indian business. Analyze the following market metrics data and return ONLY a valid JSON object — no markdown, no code fences, no extra text.
+  const curr = getCurrencyPromptGuideline(metrics);
+  let domainPersona = 'You are a senior retail BI analyst.';
+  let domainRules = `
+- COST & MARGIN DISCLOSURE: If "isCostEstimated" is true in kpis, you MUST state in "executive_summary" or "data_quality_note" that margins and profit are estimated based on standard retail benchmark COGS (65%) as unit costs were not provided in the uploaded dataset.
+- CATEGORY CONCENTRATION: If "isCategoryInferred" is true in kpis, categories were heuristically inferred from SKU descriptions. Do not report false revenue concentration risks as hard facts.`;
 
-IMPORTANT: All monetary values in your response must use Indian Rupee format:
-- Use the ₹ symbol (not $ or USD)
-- Use Indian number formatting: lakhs (₹1.96 lakhs) and crores where appropriate
+  if (domain === 'market_securities') {
+    domainPersona = 'You are a quantitative financial analyst evaluating market securities, equities, and portfolio assets.';
+    domainRules = `
+- DOMAIN FOCUS: Securities and asset trading. Analyze price action, asset volatility, returns, and traded volume.
+- TERMINOLOGY: Do NOT use retail language (no "SKUs", "inventory", "COGS", or "retail margin"). Discuss "assets/tickers", "annualized volatility", "drawdown", "cumulative returns", and "market turnover".`;
+  } else if (domain === 'financial_ledger') {
+    domainPersona = 'You are a senior financial controller evaluating general ledger accounting records and cash flows.';
+    domainRules = `
+- DOMAIN FOCUS: Double-entry accounting ledger. Analyze credit inflows, debit outflows, net cash position, and category burn.
+- TERMINOLOGY: Do NOT use retail language (no "SKUs" or "products sold"). Discuss "inflows/receipts", "outflows/expenses", "journal entries", "net cash balance", and "account heads".`;
+  } else if (domain === 'inventory_stock') {
+    domainPersona = 'You are a supply chain operations controller evaluating warehouse inventory snapshots.';
+    domainRules = `
+- DOMAIN FOCUS: Warehouse inventory management. Analyze total stock valuation, on-hand quantities, reorder thresholds, and storage costs.
+- TERMINOLOGY: Focus on "stockout risk", "reorder alerts", "warehouse valuation", and "carrying costs" rather than transactional sales.`;
+  } else if (domain === 'subscription_saas') {
+    domainPersona = 'You are a SaaS finance and metrics director analyzing recurring subscription revenue.';
+    domainRules = `
+- DOMAIN FOCUS: SaaS subscriptions. Analyze Monthly Recurring Revenue (MRR), ARR, subscriber counts, plan tiers, and churn risk.
+- TERMINOLOGY: Focus on "MRR growth", "churn risk", "tier distribution", and "subscriber retention".`;
+  } else if (domain === 'supermarket_products') {
+    domainPersona = 'You are a retail category manager and pricing analyst specializing in supermarket inventory and product margins.';
+  } else if (domain === 'generic_tabular') {
+    domainPersona = 'You are a principal business intelligence analyst evaluating tabular business data.';
+    domainRules = `
+- DOMAIN FOCUS: General business dataset. Provide statistical distribution insights, segment drivers, and timeline trends without forcing retail framing.`;
+  }
+
+  const prompt = `${domainPersona} Analyze the following dataset metrics and return ONLY a valid JSON object — no markdown, no code fences, no extra text.
+
+DOMAIN RULES:
+${domainRules}
+
+IMPORTANT: All monetary values in your response must use the correct business currency:
+- ${curr.guideline}
+- Always use the ${curr.symbol} symbol for amounts.
 
 MARKET DATA:
 ${payload}
 
 Return exactly this JSON structure (fill every field with real analysis based on the data above):
 {
-  "executive_summary": "3-4 sentence high-level summary of the business performance, mentioning specific numbers in ₹ Indian Rupee format",
+  "executive_summary": "3-4 sentence high-level summary of performance, mentioning specific numbers in ${curr.symbol}",
   "opportunities": [
-    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ₹", "impact": "high" },
-    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ₹", "impact": "medium" },
-    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ₹", "impact": "low" }
+    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ${curr.symbol}", "impact": "high" },
+    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ${curr.symbol}", "impact": "medium" },
+    { "title": "short opportunity title", "detail": "specific actionable detail with numbers in ${curr.symbol}", "impact": "low" }
   ],
   "risk_alerts": [
-    { "title": "short risk title", "detail": "specific risk detail with affected SKUs or categories, amounts in ₹", "severity": "critical" },
-    { "title": "short risk title", "detail": "specific risk detail with amounts in ₹", "severity": "warning" }
+    { "title": "short risk title", "detail": "specific risk detail with affected items or categories, amounts in ${curr.symbol}", "severity": "critical" },
+    { "title": "short risk title", "detail": "specific risk detail with amounts in ${curr.symbol}", "severity": "warning" }
   ],
   "anomalies": [
-    { "metric": "metric name", "finding": "what is unusual about this metric and why it matters, amounts in ₹" }
+    { "metric": "metric name", "finding": "what is unusual about this metric and why it matters, amounts in ${curr.symbol}" }
   ],
   "data_quality_note": "optional note about data completeness or quality issues, or omit this field"
 }
 
 Rules:
 - Base every insight on the actual numbers provided
-- Always use ₹ for any monetary amount — never use $ or USD
+- Always use ${curr.symbol} for any monetary amount
+${domainRules}
 - Return ONLY valid JSON, no other text`;
 
-  const raw = await callLLMProxy(prompt, { maxTokens: 1500, temperature: 0.3, requireJson: true });
-  const json = extractJSON(raw);
-  const parsed = JSON.parse(json) as AiStructuredInsight;
+  try {
+    const raw = await callLLMProxy(prompt, { maxTokens: 1500, temperature: 0.3, requireJson: true });
+    const json = extractJSON(raw);
+    const parsed = JSON.parse(json) as AiStructuredInsight;
+
+    if (parsed && typeof parsed === 'object') {
+      const dataQualityNote = parsed.data_quality_note || (
+        metrics.kpis.isCostEstimated
+          ? 'Data Note: Unit cost data was not provided in the source file. Profit margins reflect an industry benchmark estimate rather than measured supplier costs.'
+          : undefined
+      );
+
+      return {
+        executive_summary: parsed.executive_summary || '',
+        opportunities: Array.isArray(parsed.opportunities) ? parsed.opportunities : [],
+        risk_alerts: Array.isArray(parsed.risk_alerts) ? parsed.risk_alerts : [],
+        anomalies: Array.isArray(parsed.anomalies) ? parsed.anomalies : [],
+        data_quality_note: dataQualityNote,
+      };
+    }
+  } catch (err) {
+    console.warn('[insights] LLM Insights call failed, using deterministic business rules fallback:', err);
+  }
+
+  // Deterministic Business Synthesis Fallback (Domain-Aware)
+  const locale = metrics.kpis?.currency === 'GBP' ? 'en-GB' : metrics.kpis?.currency === 'USD' ? 'en-US' : 'en-IN';
+  const sym = curr.symbol;
+  const revStr = `${sym}${metrics.kpis.totalRevenue.toLocaleString(locale)}`;
+  const topCat = metrics.revenueByCategory[0]?.category || 'Primary Segment';
+  const topProd = metrics.topProducts[0]?.name || 'Top Asset / Item';
+
+  if (domain === 'market_securities') {
+    return {
+      executive_summary: `Tracked assets generated ${revStr} in total market turnover across ${metrics.kpis.skuCount} securities. Top traded asset was ${topProd}, driving significant market volume. Overall portfolio position indicates ${metrics.kpis.profitMarginPct >= 0 ? '+' : ''}${metrics.kpis.profitMarginPct.toFixed(1)}% cumulative return.`,
+      opportunities: [
+        { title: 'Rebalance Leading Assets', detail: `Capitalize on momentum in ${topCat} to optimize risk-adjusted returns.`, impact: 'high' },
+      ],
+      riskAlertMetric: undefined,
+      risk_alerts: metrics.kpis.lowStockCount > 0 ? [
+        { title: 'Elevated Market Volatility', detail: 'Identified heightened price volatility or drawdown across tracked securities.', severity: 'warning' },
+      ] : [],
+      anomalies: [],
+    };
+  }
+
+  if (domain === 'financial_ledger') {
+    const netPos = metrics.kpis.totalProfit;
+    return {
+      executive_summary: `Ledger accounts recorded ${revStr} in total inflows against ${sym}${metrics.kpis.totalCost.toLocaleString(locale)} in recorded outflows, resulting in a net cash position of ${sym}${netPos.toLocaleString(locale)}. Top expense category was ${topCat}.`,
+      opportunities: [
+        { title: `Audit ${topCat} Expenses`, detail: `Review expenditure patterns in ${topCat} to identify cost reduction opportunities.`, impact: 'high' },
+      ],
+      risk_alerts: netPos < 0 ? [
+        { title: 'Cash Outflow Deficit', detail: 'Outflows currently exceed inflows, requiring working capital review.', severity: 'critical' },
+      ] : [],
+      anomalies: [],
+    };
+  }
+
+  if (domain === 'inventory_stock') {
+    return {
+      executive_summary: `Warehouse facilities hold an aggregate valuation of ${revStr} across ${metrics.kpis.skuCount} active SKUs. ${topCat} represents the largest storage allocation. Estimated annual holding and carrying costs are ${sym}${metrics.kpis.totalCost.toLocaleString(locale)}.`,
+      opportunities: [
+        { title: `Streamline ${topCat} Buffer Stock`, detail: `Optimize safety stock levels in ${topCat} to reduce inventory carrying overhead.`, impact: 'medium' },
+      ],
+      risk_alerts: metrics.kpis.lowStockCount > 0 ? [
+        { title: `${metrics.kpis.lowStockCount} SKUs Below Reorder Threshold`, detail: 'Multiple inventory lines have breached minimum safety stock levels.', severity: 'critical' },
+      ] : [],
+      anomalies: [],
+    };
+  }
+
+  if (domain === 'subscription_saas') {
+    return {
+      executive_summary: `The subscription portfolio generates ${revStr} in Monthly Recurring Revenue (MRR) across ${metrics.kpis.totalUnits} active subscribers. The ${topCat} tier accounts for the largest revenue share, with an annualized run-rate of ${sym}${metrics.kpis.inventoryValue.toLocaleString(locale)}.`,
+      opportunities: [
+        { title: `Upsell ${topCat} Tier Subscribers`, detail: 'Target expansion revenue by migrating standard tier accounts to higher tier features.', impact: 'high' },
+      ],
+      risk_alerts: metrics.kpis.lowStockCount > 0 ? [
+        { title: `${metrics.kpis.lowStockCount} Churned Accounts Detected`, detail: 'Identified canceled or expired subscriber accounts requiring retention intervention.', severity: 'warning' },
+      ] : [],
+      anomalies: [],
+    };
+  }
+
+  // Retail and Generic Fallback
+  const topProdRev = metrics.topProducts[0] ? `${sym}${metrics.topProducts[0].revenue.toLocaleString(locale)}` : `${sym}0`;
+  const marginNote = metrics.kpis.isCostEstimated ? ' (estimated benchmark)' : '';
 
   return {
-    executive_summary: parsed.executive_summary || '',
-    opportunities: Array.isArray(parsed.opportunities) ? parsed.opportunities : [],
-    risk_alerts: Array.isArray(parsed.risk_alerts) ? parsed.risk_alerts : [],
-    anomalies: Array.isArray(parsed.anomalies) ? parsed.anomalies : [],
-    data_quality_note: parsed.data_quality_note,
+    executive_summary: `The business achieved ${revStr} in revenue with a gross margin of ${metrics.kpis.profitMarginPct.toFixed(1)}%${marginNote}. Primary sales volume was driven by the ${topCat} department, with top performer ${topProd} generating ${topProdRev}.${metrics.kpis.isCostEstimated ? ' Note: Margin is modeled on standard retail COGS benchmarks due to missing supplier cost data.' : ''}`,
+    data_quality_note: metrics.kpis.isCostEstimated ? 'Data Note: Source file lacks unit cost column. Profit and margin figures reflect an industry benchmark estimate (65% COGS / 35% margin).' : undefined,
+    opportunities: [
+      {
+        title: `Scale ${topCat} Inventory`,
+        detail: `The ${topCat} category drives the highest sales volume. Expanding related SKUs could capture an estimated 15-20% incremental revenue.`,
+        impact: 'high',
+      },
+      {
+        title: `Optimize Pricing for Top 5 SKUs`,
+        detail: `Top SKUs show strong inelastic demand. A targeted 3-5% price adjustment could improve net margins by ${sym}${Math.round(metrics.kpis.totalRevenue * 0.03).toLocaleString(locale)}.`,
+        impact: 'medium',
+      },
+    ],
+    risk_alerts: metrics.kpis.lowStockCount > 0 ? [
+      {
+        title: `${metrics.kpis.lowStockCount} SKUs Near Reorder Threshold`,
+        detail: `Identified inventory items below minimum safety stock levels, risking delivery stockouts.`,
+        severity: 'warning',
+      },
+    ] : [
+      {
+        title: metrics.kpis.isCostEstimated ? 'Estimated COGS Margin' : 'Healthy Inventory Buffer',
+        detail: metrics.kpis.isCostEstimated
+          ? 'Profit calculations use standard retail benchmark margins (35%) because supplier invoices were absent from this dataset.'
+          : 'Leading product lines exhibit stable operational flow with balanced inventory turnover.',
+        severity: metrics.kpis.isCostEstimated ? 'warning' : 'info' as any,
+      },
+    ],
+    anomalies: [
+      {
+        metric: 'Category Concentration',
+        finding: `${topCat} represents over ${(metrics.revenueByCategory[0] && metrics.kpis.totalRevenue > 0 ? (metrics.revenueByCategory[0].revenue / metrics.kpis.totalRevenue) * 100 : 40).toFixed(0)}% of turnover.`,
+      },
+    ],
   };
 }
 
@@ -158,13 +313,14 @@ export async function generateAiNarrative(metrics: MarketMetrics): Promise<strin
       : null,
   };
 
-  const prompt = `You are a senior BI executive report writer for an Indian retail business. Analyze this retail data and return ONLY a JSON object with a polished, high-impact executive narrative paragraph.
+  const curr = getCurrencyPromptGuideline(metrics);
+  const prompt = `You are a senior BI executive report writer. Analyze this business data and return ONLY a JSON object with a polished, high-impact executive narrative paragraph.
 
 DATA: ${JSON.stringify(payload)}
 
 Return strictly this JSON format:
 {
-  "narrative": "A concise, professional 3-4 sentence paragraph highlighting the revenue performance, top growth drivers, and stock/cost risk. Use Indian currency format (₹). Do not include internal thinking, self-talk, or prompt echoes."
+  "narrative": "A concise, professional 3-4 sentence paragraph highlighting revenue performance, top growth drivers, and stock/cost risk. ${curr.guideline} Do not include internal thinking, self-talk, or prompt echoes."
 }`;
 
   try {
@@ -179,10 +335,11 @@ Return strictly this JSON format:
   }
 
   // High-quality deterministic summary fallback
-  const rev = metrics.kpis.totalRevenue.toLocaleString('en-IN');
-  const units = metrics.kpis.totalUnits.toLocaleString('en-IN');
+  const locale = metrics.kpis?.currency === 'GBP' ? 'en-GB' : metrics.kpis?.currency === 'USD' ? 'en-US' : 'en-IN';
+  const rev = metrics.kpis.totalRevenue.toLocaleString(locale);
+  const units = metrics.kpis.totalUnits.toLocaleString(locale);
   const topProd = metrics.topProducts[0]?.name || 'Top Product';
-  return `The business generated ₹${rev} across ${units} units sold, led primarily by ${topProd}. Profit margin is recorded at ${metrics.kpis.profitMarginPct.toFixed(1)}% with ${metrics.kpis.lowStockCount} low-stock SKUs currently requiring inventory attention.`;
+  return `The business generated ${curr.symbol}${rev} across ${units} units sold, led primarily by ${topProd}. Profit margin is recorded at ${metrics.kpis.profitMarginPct.toFixed(1)}% with ${metrics.kpis.lowStockCount} low-stock SKUs currently requiring inventory attention.`;
 }
 
 /**

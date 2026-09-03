@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, AlertTriangle, Sparkles, FileText, ArrowRight } from 'lucide-react';
 import type { ExtractionResult } from '../utils/document-extractor';
-import { detectTableType, mapTableHeuristic, transformRowsToCanonical, TableType, TableMappingResult } from '@/services/llm/schema-mapper';
+import { detectTableType, mapTableHeuristic, transformRowsToCanonical, inferCategoryFromName, TableType, TableMappingResult } from '@/services/llm/schema-mapper';
+import { classifyDataset, type DatasetDomain, type ColumnRoles, DOMAIN_METADATA } from '@/services/llm/domain/dataset-classifier';
 import type { SalesRow, ProductRow, StockRow, InvestmentRow } from '../utils/market-metrics-core';
 
 interface MappingPreviewModalProps {
@@ -23,10 +24,18 @@ interface MappingPreviewModalProps {
     products: ProductRow[];
     stock: StockRow[];
     investments: InvestmentRow[];
+    domain?: DatasetDomain;
+    roles?: ColumnRoles;
+    isCostEstimated?: boolean;
   }) => void;
 }
 
 export function MappingPreviewModal({ isOpen, onClose, extractionResults, onConfirm }: MappingPreviewModalProps) {
+  const [selectedDomain, setSelectedDomain] = useState<DatasetDomain>('retail_transactions');
+  const [domainConfidence, setDomainConfidence] = useState<number>(0.95);
+  const [domainReasoning, setDomainReasoning] = useState<string>('');
+  const [detectedRoles, setDetectedRoles] = useState<ColumnRoles>({});
+
   const [tableMappings, setTableMappings] = useState<{
     key: string;
     sheetName: string;
@@ -41,6 +50,17 @@ export function MappingPreviewModal({ isOpen, onClose, extractionResults, onConf
 
   useEffect(() => {
     if (!isOpen || extractionResults.length === 0) return;
+
+    // Classify primary dataset domain
+    const primarySheet = extractionResults[0]?.sheets[0];
+    if (primarySheet) {
+      classifyDataset(primarySheet.headers, primarySheet.data.slice(0, 10)).then((res) => {
+        setSelectedDomain(res.domain);
+        setDomainConfidence(res.confidence);
+        setDomainReasoning(res.reasoning);
+        setDetectedRoles(res.detectedRoles);
+      });
+    }
 
     const prepared: typeof tableMappings = [];
 
@@ -123,63 +143,70 @@ export function MappingPreviewModal({ isOpen, onClose, extractionResults, onConf
       else if (item.detectedType === 'investments') investments = investments.concat(canonicalData as InvestmentRow[]);
     });
 
+    // Check whether the user has mapped a genuine unit cost column
+    const hasMappedCost = tableMappings.some((t) =>
+      t.mapping.fieldMappings.some((m) => m.canonicalField === 'cost' && Boolean(m.sourceHeader))
+    );
+    const isCostEstimated = !hasMappedCost;
+
     // Auto-derive Products catalogue if missing from uploaded single-file data
     if (products.length === 0 && (sales.length > 0 || tableMappings.length > 0)) {
-      const rawDataList = tableMappings.flatMap((t) => t.data);
       const seenSkus = new Set<string>();
 
-      rawDataList.forEach((row, idx) => {
-        const sku = String(row['prod_id'] ?? row['product_id'] ?? row['item_code'] ?? row['sku'] ?? `SKU-${idx + 1}`);
-        if (seenSkus.has(sku)) return;
-        seenSkus.add(sku);
+      // Scan rows across all tables to collect unique SKUs, names, and prices
+      for (const t of tableMappings) {
+        for (const row of t.data) {
+          const rawSku = row['StockCode'] ?? row['stock_code'] ?? row['stockcode'] ?? row['Item_Identifier'] ?? row['prod_id'] ?? row['product_id'] ?? row['item_code'] ?? row['sku'] ?? row['code'] ?? row['id'];
+          const sku = rawSku ? String(rawSku).trim() : '';
+          if (!sku || seenSkus.has(sku)) continue;
+          seenSkus.add(sku);
 
-        const name = String(row['item_desc'] ?? row['product_name'] ?? row['item_name'] ?? row['title'] ?? row['name'] ?? sku);
-        const category = String(row['dept_group'] ?? row['category'] ?? row['department'] ?? 'General');
-        const price = Number(row['selling_price_inr'] ?? row['unit_price'] ?? row['price'] ?? row['rate'] ?? 100);
-        const cost = Number(row['cost_per_unit'] ?? row['unit_cost'] ?? row['cost_price'] ?? row['cogs'] ?? Math.round(price * 0.65));
+          const rawName = row['Description'] ?? row['description'] ?? row['Item_Type'] ?? row['item_desc'] ?? row['product_name'] ?? row['item_name'] ?? row['title'] ?? row['name'];
+          const name = rawName ? String(rawName).trim() : `Item ${sku}`;
 
-        products.push({
-          sku,
-          name,
-          category,
-          subcategory: 'Standard',
-          brand: 'Generic',
-          price,
-          cost,
-          supplier: 'Main Supplier',
-          shelf_life_days: 180,
-          weight_kg: 1.0,
-          launch_date: '2024-01-01',
-        });
-      });
+          const rawCategory = row['dept_group'] ?? row['category'] ?? row['department'] ?? row['Item_Type'];
+          const category = rawCategory ? String(rawCategory).trim() : inferCategoryFromName(name);
+
+          const rawPrice = Number(row['selling_price_inr'] ?? row['unit_price'] ?? row['price'] ?? row['rate'] ?? row['mrp'] ?? row['UnitPrice'] ?? row['Price'] ?? 100);
+          const price = isNaN(rawPrice) || rawPrice <= 0 ? 100 : Math.abs(rawPrice);
+
+          const rawCost = hasMappedCost ? Number(row['cost_per_unit'] ?? row['unit_cost'] ?? row['cost_price'] ?? row['cogs'] ?? row['cost']) : 0;
+          const cost = !isNaN(rawCost) && rawCost > 0 ? rawCost : 0;
+
+          products.push({
+            sku,
+            name,
+            category,
+            subcategory: 'Standard',
+            brand: 'Generic',
+            price,
+            cost,
+            supplier: 'Main Supplier',
+            shelf_life_days: 180,
+            weight_kg: 1.0,
+            launch_date: '2024-01-01',
+          });
+
+          // Safeguard to prevent excessive memory on huge catalogues
+          if (products.length >= 50000) break;
+        }
+        if (products.length >= 50000) break;
+      }
     }
 
-    // Auto-derive Stock inventory if missing from uploaded single-file data
-    if (stock.length === 0 && (sales.length > 0 || tableMappings.length > 0)) {
-      const rawDataList = tableMappings.flatMap((t) => t.data);
-      const seenSkus = new Set<string>();
+    // Note: Pure transactional sales files do not contain inventory snapshots.
+    // We intentionally leave stock empty rather than synthesizing fabricated stock rows,
+    // allowing the UI to accurately mark inventory as "Not Tracked / No Stock Data".
 
-      rawDataList.forEach((row, idx) => {
-        const sku = String(row['prod_id'] ?? row['product_id'] ?? row['item_code'] ?? row['sku'] ?? `SKU-${idx + 1}`);
-        if (seenSkus.has(sku)) return;
-        seenSkus.add(sku);
-
-        const qty = Number(row['available_stock_qty'] ?? row['stock_level'] ?? row['stock'] ?? row['quantity'] ?? 50);
-        const dateStr = String(row['txn_date'] ?? row['date'] ?? new Date().toISOString().split('T')[0]);
-
-        stock.push({
-          sku,
-          date: dateStr,
-          quantity: qty,
-          beginning_stock: qty + 10,
-          units_sold: 5,
-          reorder_point: 15,
-          supplier_lead_time: 3,
-        });
-      });
-    }
-
-    onConfirm({ sales, products, stock, investments });
+    onConfirm({
+      sales,
+      products,
+      stock,
+      investments,
+      domain: selectedDomain,
+      roles: detectedRoles,
+      isCostEstimated,
+    });
     onClose();
   };
 
@@ -189,12 +216,55 @@ export function MappingPreviewModal({ isOpen, onClose, extractionResults, onConf
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Sparkles className="h-5 w-5 text-primary" />
-            AI Universal Schema Mapper & Data Normalizer
+            AI Universal Schema Mapper & Multi-Domain Classifier
           </DialogTitle>
           <DialogDescription>
-            KLAROS automatically detected your file schemas and mapped columns to the core retail analytics engine. Review or customize column bindings below.
+            KLAROS automatically classifies your dataset domain and maps columns to specialized business intelligence rulesets.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Domain Classification & User Override Banner */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs my-1">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Detected Domain</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200 text-[10px] font-bold">
+                  {Math.round(domainConfidence * 100)}% Confidence
+                </Badge>
+              </div>
+              <p className="text-sm font-bold text-slate-900 mt-0.5">
+                {DOMAIN_METADATA[selectedDomain]?.displayName || selectedDomain}
+              </p>
+              <p className="text-xs text-slate-500 line-clamp-1">{domainReasoning}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-slate-500 font-semibold whitespace-nowrap">Domain Override:</span>
+            <Select
+              value={selectedDomain}
+              onValueChange={(val) => {
+                setSelectedDomain(val as DatasetDomain);
+              }}
+            >
+              <SelectTrigger className="h-9 w-48 rounded-xl bg-white border-slate-200 text-xs font-bold text-slate-800 shadow-sm">
+                <SelectValue placeholder="Select domain" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="retail_transactions">Retail Transactions</SelectItem>
+                <SelectItem value="market_securities">Market Securities</SelectItem>
+                <SelectItem value="inventory_stock">Inventory & Stock</SelectItem>
+                <SelectItem value="financial_ledger">Financial Ledger</SelectItem>
+                <SelectItem value="subscription_saas">SaaS Subscriptions</SelectItem>
+                <SelectItem value="generic_tabular">General Business Data</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {tableMappings.length > 0 && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">

@@ -71,6 +71,9 @@ export default function ConnectData() {
     products: ProductRow[];
     stock: StockRow[];
     investments: InvestmentRow[];
+    domain?: import('@/services/llm/domain/dataset-classifier').DatasetDomain;
+    roles?: import('@/services/llm/domain/dataset-classifier').ColumnRoles;
+    isCostEstimated?: boolean;
   }) => {
     if (!user) {
       toast({ title: 'Sign in required', description: 'Please sign in to upload datasets.', variant: 'destructive' });

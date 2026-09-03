@@ -32,15 +32,25 @@ export function isProxyConfigured(): boolean {
   return import.meta.env.PROD === true || import.meta.env.VITE_USE_LLM_PROXY === 'true';
 }
 
+function getEnv(key: string): string | undefined {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] as string | undefined;
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  return undefined;
+}
+
 /**
  * Returns true if an AI API key is available either via the /api/llm proxy
  * or via direct client environment variables (VITE_GROQ_API_KEY, VITE_OPENROUTER_API_KEY, VITE_GEMINI_API_KEY).
  */
 export function hasApiKey(): boolean {
   if (isProxyConfigured()) return true;
-  const groq = import.meta.env.VITE_GROQ_API_KEY;
-  const openrouter = import.meta.env.VITE_OPENROUTER_API_KEY;
-  const gemini = import.meta.env.VITE_GEMINI_API_KEY;
+  const groq = getEnv('VITE_GROQ_API_KEY');
+  const openrouter = getEnv('VITE_OPENROUTER_API_KEY');
+  const gemini = getEnv('VITE_GEMINI_API_KEY');
   return Boolean(
     (groq && groq.length > 5) ||
     (openrouter && openrouter.length > 5) ||
@@ -123,9 +133,9 @@ async function callViaProxy(prompt: string, options: LLMCallOptions): Promise<st
 
 // ─── Direct Path (npm run dev fallback only) ──────────────────────────────────
 
-const GROQ_KEY       = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
-const OR_KEY         = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
-const GEM_KEY        = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+const GROQ_KEY       = getEnv('VITE_GROQ_API_KEY');
+const OR_KEY         = getEnv('VITE_OPENROUTER_API_KEY');
+const GEM_KEY        = getEnv('VITE_GEMINI_API_KEY');
 
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',

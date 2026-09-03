@@ -267,6 +267,20 @@ export async function loadMarketMetrics(datasetId = 'dataset1'): Promise<MarketM
 
   const promise = (async (): Promise<MarketMetrics> => {
     try {
+      const isUploaded = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(datasetId);
+      if (isUploaded) {
+        const { getSupabaseClient } = await import('@/services/supabase/supabase');
+        const client = await getSupabaseClient();
+        const { data } = await client.from('data_sources').select('counts').eq('id', datasetId).single();
+        const counts = data?.counts as Record<string, unknown> | undefined;
+        if (counts?.precomputed_metrics) {
+          const precomputed = counts.precomputed_metrics as MarketMetrics;
+          metricsCache.set(datasetId, precomputed);
+          writeCache(`${METRICS_CACHE_KEY}${datasetId}`, precomputed);
+          return precomputed;
+        }
+      }
+
       const dataset = await loadMarketDataset(datasetId);
       // Off main thread — never blocks React rendering
       const result = await buildMetricsInWorker(dataset);
@@ -302,6 +316,20 @@ export async function loadMarketHistory(datasetId = 'dataset1', months = 3): Pro
 
   const promise = (async (): Promise<MarketHistory> => {
     try {
+      const isUploaded = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(datasetId);
+      if (isUploaded) {
+        const { getSupabaseClient } = await import('@/services/supabase/supabase');
+        const client = await getSupabaseClient();
+        const { data } = await client.from('data_sources').select('counts').eq('id', datasetId).single();
+        const counts = data?.counts as Record<string, unknown> | undefined;
+        if (counts?.precomputed_history) {
+          const precomputed = counts.precomputed_history as MarketHistory;
+          historyCache.set(cacheKey, precomputed);
+          writeCache(cacheKey, precomputed);
+          return precomputed;
+        }
+      }
+
       const { sales, products, stock } = await loadMarketDataset(datasetId);
       const result = await buildHistoryInWorker({ sales, products, stock }, months);
       historyCache.set(cacheKey, result);

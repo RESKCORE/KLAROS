@@ -27,16 +27,21 @@ const MAX_ATTEMPTS = 3;
 // ─── Prompt ───────────────────────────────────────────────────────────────────
 
 function buildMcdaPrompt(metricsJson: string): string {
-  return `You are a BI AI for an Indian retail business. Perform a Multi-Criteria Decision Analysis (MCDA) using the Analytic Hierarchy Process (AHP) on the retail business data below.
+  const isGbp = metricsJson.includes('"currency":"GBP"') || metricsJson.includes('"currencySymbol":"£"');
+  const currencyGuideline = isGbp
+    ? '6. CURRENCY: Always use British Pounds (£ / GBP) — never ₹ or $. Use standard UK notation (e.g. £15,000, £2.4M).'
+    : '6. CURRENCY: Always use ₹ (Indian Rupee) — never $ or USD. Use Indian notation (lakhs/crores).';
+
+  return `You are a strategic business intelligence advisor. Perform a Multi-Criteria Decision Analysis (MCDA) using the Analytic Hierarchy Process (AHP) on the business data below.
 
 Data: ${metricsJson}
 
 RULES:
 1. Create exactly 3 strategic options and 3 evaluation criteria derived from the actual data.
-2. Instead of guessing weights or scores, make QUALITATIVE PAIRWISE COMPARISONS using Saaty's 1-9 scale:
-   - 1 = Equal importance/preference
-   - 3 = Moderate
-   - 5 = Strong
+2. Pairwise comparison scale (Saaty 1–9):
+   - 1 = Equal importance
+   - 3 = Moderate importance
+   - 5 = Strong importance
    - 7 = Very strong
    - 9 = Extreme
    (Use values between 1–9 only; fractions like 1/3 are expressed as 0.333)
@@ -45,7 +50,7 @@ RULES:
 4. Option comparisons (optionComparisons): for each criterion, compare how much better each option is.
    Format: array of 3 arrays (one per criterion): [[O1vsO2, O1vsO3, O2vsO3], [...], [...]]
 5. confidence must be 0-100.
-6. CURRENCY: Always use ₹ (Indian Rupee) — never $ or USD. Use Indian notation (lakhs/crores).
+${currencyGuideline}
 7. Return ONLY valid JSON — no markdown, no code fences, no explanations.
 8. Every string must be properly quoted and closed.
 
@@ -88,19 +93,19 @@ function applyAhpSynthesis(mcdaResult: McdaRawResponse): void {
 
   if (!criteriaComparisons || !optionComparisons || !options || !criteria) return;
 
-  const comparisons = criteriaComparisons as [number, number, number];
-  const optionComps = optionComparisons as [[number, number, number], [number, number, number], [number, number, number]];
+  const mCount = criteria.length;
+  const nCount = options.length;
 
-  if (comparisons.length !== 3 || optionComps.length !== 3 || !optionComps.every((c) => c.length === 3)) {
-    console.warn('[MCDA] AHP comparisons have wrong shape — skipping synthesis');
-    return;
-  }
-
-  const synthesis = ahpSynthesis({ criteriaComparisons: comparisons, optionComparisons: optionComps });
+  const synthesis = ahpSynthesis({
+    criteriaComparisons: criteriaComparisons as number[],
+    optionComparisons: optionComparisons as number[][],
+    criteriaCount: mCount,
+    optionsCount: nCount,
+  });
 
   // Attach computed weights to criteria
   criteria.forEach((c, i) => {
-    c.weight = Math.round(synthesis.weights[i] * 1000) / 1000;
+    c.weight = Math.round((synthesis.weights[i] ?? (1 / mCount)) * 1000) / 1000;
   });
 
   // Build normalised scores array (0–100 scale)
@@ -108,17 +113,17 @@ function applyAhpSynthesis(mcdaResult: McdaRawResponse): void {
   mcdaResult.scores = options.map((opt, optIdx) => {
     const score: Record<string, string | number> = {
       optionId: opt.id,
-      total: Math.round(synthesis.totalScores[optIdx] * 100),
+      total: Math.round((synthesis.totalScores[optIdx] ?? 0) * 100),
     };
     scoreKeys.forEach((key, critIdx) => {
-      score[key] = Math.round(synthesis.optionVectors[critIdx][optIdx] * 100);
+      score[key] = Math.round((synthesis.optionVectors[critIdx]?.[optIdx] ?? 0) * 100);
     });
     return score;
   });
 
   if (!synthesis.consistency.isConsistent) {
     console.warn(
-      `[MCDA] AHP consistency warning: criteriaCR=${synthesis.consistency.criteriaCR.toFixed(3)}, ` +
+      `[MCDA] AHP consistency notice: criteriaCR=${synthesis.consistency.criteriaCR.toFixed(3)}, ` +
       `optionCRs=[${synthesis.consistency.optionCRs.map((c) => c.toFixed(3)).join(', ')}]`,
     );
   }

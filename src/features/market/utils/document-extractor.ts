@@ -47,16 +47,71 @@ export async function parseDocument(file: File): Promise<ExtractionResult> {
   return parseCsv(file);
 }
 
+// ─── Quote Sanitizer for Robust CSV Parsing ──────────────────────────────────
+
+/**
+ * Sanitizes stray/unescaped quotes in CSV text so PapaParse never swallows
+ * subsequent lines into an unclosed multi-line quote.
+ * Handles retail descriptions containing unescaped inch marks (e.g. 4" CAKESTAND)
+ * or unbalanced quotes.
+ */
+export function sanitizeCsvText(text: string): string {
+  if (!text.includes('"')) return text;
+
+  const lines = text.split(/\r?\n/);
+  const sanitizedLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (!line) {
+      sanitizedLines.push(line);
+      continue;
+    }
+
+    // Count double quotes in this line
+    let quoteCount = 0;
+    for (let c = 0; c < line.length; c++) {
+      if (line[c] === '"') quoteCount++;
+    }
+
+    // If odd number of quotes, an unescaped quote has opened and wasn't closed on this line
+    if (quoteCount % 2 !== 0) {
+      // Replace stray internal quotes that are neither preceded nor followed by delimiter/boundary
+      // e.g. 4" CAKESTAND -> 4' CAKESTAND
+      line = line.replace(/(?<!^|,)"(?!,|$)/g, "'");
+
+      // Recount quotes
+      let newCount = 0;
+      for (let c = 0; c < line.length; c++) {
+        if (line[c] === '"') newCount++;
+      }
+
+      // If still odd, close it at the end of the line
+      if (newCount % 2 !== 0) {
+        line = line + '"';
+      }
+    }
+
+    sanitizedLines.push(line);
+  }
+
+  return sanitizedLines.join('\n');
+}
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 
 async function parseCsv(file: File): Promise<ExtractionResult> {
+  const rawText = await readFileAsText(file);
+  const cleanText = sanitizeCsvText(rawText);
+
   return new Promise((resolve, reject) => {
-    Papa.parse<Record<string, unknown>>(file, {
+    Papa.parse<Record<string, unknown>>(cleanText, {
       header: true,
       skipEmptyLines: 'greedy',
       dynamicTyping: true,
       complete: (results) => {
         const headers = results.meta.fields ?? (results.data[0] ? Object.keys(results.data[0]) : []);
+        console.log(`[DocumentExtractor] Successfully parsed ${results.data.length} rows from CSV ${file.name}`);
         resolve({
           fileName: file.name,
           fileType: 'csv',
@@ -78,7 +133,8 @@ async function parseCsv(file: File): Promise<ExtractionResult> {
 
 async function parseExcel(file: File): Promise<ExtractionResult> {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  // Parse full workbook across all sheets with dense cell storage for memory efficiency
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, dense: true });
 
   const sheets: ExtractedSheet[] = [];
 
